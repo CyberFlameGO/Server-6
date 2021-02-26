@@ -1,0 +1,30 @@
+{
+	"compilerOptions": {
+		"outDir": "dist/",
+		"sourceMap": true,
+		"module": "CommonJS",
+		"moduleResolution": "node",
+		"target": "ES6",
+		"baseUrl": ".",
+		"experimentalDecorators": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"strict": true,
+
+        "paths": {
+            "src/*": ["./src/*"],
+			"@typings/*": ["../Shared/typings/*"],
+			"Config": ["./config.json"]
+        },
+        "plugins": [
+            {
+                "transform": "typescript-transform-paths",
+                "useRootDirs": true
+            }
+        ]
+	},
+
+	"include": [
+		"src/**/*"
+	]
+}
