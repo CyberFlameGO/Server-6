@@ -1,8 +1,9 @@
-import { combineRoutes, HttpRequest, r } from '@marblejs/core';
-import { hostname, twitch_client_id, twitch_client_secret, tls, app_url } from 'Config';
-import { map, mapTo, switchMap, tap } from 'rxjs/operators';
+import { combineRoutes, r } from '@marblejs/core';
+import { generateToken } from '@marblejs/middleware-jwt';
+import { hostname, twitch_client_id, twitch_client_secret, tls, app_url, jwt_secret } from 'Config';
+import { concatAll, map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { post } from 'superagent';
-import { Observable } from 'rxjs';
+import { asyncScheduler, Observable, scheduled } from 'rxjs';
 import { API } from '@typings/API';
 import { TwitchUser } from 'src/Util/TwitchUser';
 
@@ -42,16 +43,24 @@ namespace AuthCallback {
 		r.matchPath('/callback'),
 		r.matchType('GET'),
 		r.useEffect(req$ => req$.pipe(
-			// map(req => ({
-			// 	body: getMarkupWrapper(hostname, { Pag: 'Man' }),
-			// 	headers: { 'Content-Type': 'text/html' }
-			// }))
-			switchMap(req => ExchangeCode((req.query as { code: string }).code)),
-			switchMap(grant => TwitchUser.connect(grant)),
+			switchMap(req => ExchangeCode((req.query as { code: string }).code)), // Exchange received code for an access token grant
+			switchMap(grant => TwitchUser.connect(grant)), // Connect as the Twitch
+			switchMap(user => scheduled([
+				user.writeUser(),
+				user.writeToken()
+			], asyncScheduler).pipe(concatAll())), // Update (or create) user & token grant in the DB
 			tap(x => console.log(x)),
-			map(grant => ({
+
+			// Generate a JWR
+			map(user => generateToken({
+				secret: Buffer.from(jwt_secret)
+			})({
+				twid: user.data.id
+			})),
+			tap(tok => console.log(tok)),
+			map(jwt => ({
 				status: 301,
-				headers: { 'Location': `${app_url}/callback?data=${JSON.stringify(grant.data)}` }
+				headers: { 'Location': `${app_url}/callback?token=${jwt}` }
 			}))
 		))
 	);

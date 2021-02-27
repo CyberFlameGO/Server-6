@@ -5,6 +5,7 @@ import { RootRoute } from 'src/API/Routes/RootRoute';
 import { EmotesRoute } from 'src/API/Routes/EmotesRoute';
 import { AuthRoute } from 'src/API/Routes/AuthRoute';
 import { cors$ } from '@marblejs/middleware-cors';
+import { UsersRoute } from 'src/API/Routes/UsersRoute';
 
 export class HttpListener {
 	setMiddlewares(): HttpMiddlewareEffect[] {
@@ -25,7 +26,8 @@ export class HttpListener {
 			effects: [
 				RootRoute,
 				EmotesRoute,
-				AuthRoute
+				AuthRoute,
+				UsersRoute
 			]
 		});
 
