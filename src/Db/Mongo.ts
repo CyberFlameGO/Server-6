@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Collection } from 'mongodb';
 import { mongo_uri } from 'Config';
 import { from, iif, Observable, of } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
@@ -8,12 +8,13 @@ export class Mongo extends MongoClient {
 	private DB_NAME = '7tv';
 	private static instance: Mongo;
 	static Get(): Mongo {
-		return this.instance ?? (Mongo.instance = new Mongo());
+		return this.instance ?? (new Mongo());
 	}
 
 	constructor() {
 		super(mongo_uri, { useUnifiedTopology: true });
 
+		Mongo.instance = this;
 		// Connect to the database
 		this.connect(err => {
 			if (err) return console.error(`Could not connect to MongoDB: ${err}`);
@@ -27,6 +28,7 @@ export class Mongo extends MongoClient {
 	collection<T>(name: string): Observable<Collection<T>>;
 	collection<T extends DataStructure.TwitchUser>(name: 'users'): Observable<Collection<T>>;
 	collection<T extends DataStructure.Emote>(name: 'emotes'): Observable<Collection<T>>;
+	collection<T extends DataStructure.BearerToken>(name: 'oauth'): Observable<Collection<T>>;
 	collection<T>(name: string): Observable<Collection<T>> {
 		return new Observable<Collection<T>>(observer => {
 			of(this.db(this.DB_NAME)).pipe(
