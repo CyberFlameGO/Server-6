@@ -28,20 +28,29 @@ export class Emote {
 			const sizes = [[4, 128], [3, 76], [2, 48], [1, 32]];
 			const isAnimated = this.data.mime === 'image/gif';
 			const fileExtension = isAnimated ? 'gif' : 'png';
+			const originalSize = Array(2) as number[];
 
 			console.log(this.data.mime, 'mime');
 			this.ensureFilepath().pipe( // Read original image
 				switchMap(() => of(sharp(`${this.filepath}/og`, { animated: true }))),
 				switchMap(image => from(image.metadata()).pipe(map(meta => ({ meta, image })))),
+				tap(({ meta }) => {
+					originalSize[0] = meta.width ?? 0;
+					originalSize[1] = (meta.pages ?? 1) > 1 ? (meta.height ?? 0) / (meta.pages ?? 0) : meta.height ?? 0;
+					console.log('og', originalSize, meta.pages, meta.height);
+				}),
 				switchMap(({ image, meta }) => from(sizes).pipe(
-					concatMap(([scope, size]) => iif(() => isAnimated,
+					map(([scope, size]) => ({
+						scope,
+						meta,
+						size: this.getSizeRatio(originalSize, [size, size])
+					})),
+					concatMap(({ scope, size, meta }) => iif(() => isAnimated,
 						of(undefined).pipe(
-							tap(x => console.log('Is gif')),
-							switchMap(() => image.resize(size).toFormat('gif', { pageHeight: size }).toFile(`${this.filepath}/${scope}x.${fileExtension}`))
+							switchMap(() => image.toFormat('gif', { pageHeight: size[1], force: true }).resize(size[0], size[1] * (meta.pages ?? 1)).toFile(`${this.filepath}/${scope}x.${fileExtension}`))
 						),
 						of(undefined).pipe(
-							tap(() => console.log('Not gif')),
-							switchMap(() => image.resize(size, null).toFormat('png').toFile(`${this.filepath}/${scope}x.${fileExtension}`))
+							switchMap(() => image.resize(size[0], size[1], undefined).toFormat('png').toFile(`${this.filepath}/${scope}x.${fileExtension}`))
 						)
 					).pipe(mapTo((scope))))
 				)),
@@ -57,6 +66,12 @@ export class Emote {
 				error(err) { observer.error(err); }
 			});
 		});
+	}
+
+	getSizeRatio(og: number[], nw: number[]): number[] {
+		const ratio = Math.min(nw[0] / og[0], nw[1] / og[1]);
+
+		return [ og[0] * ratio, og[1] * ratio ].map(n => Math.floor(n));
 	}
 
 	/**
