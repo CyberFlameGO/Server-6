@@ -39,3 +39,4 @@ ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 # Build app
 ENV NODE_ENV=production
+RUN git clone https://github.com/SevenTV/Typings.git
