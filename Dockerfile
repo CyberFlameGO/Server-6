@@ -2,40 +2,16 @@ FROM node:12-slim
 
 WORKDIR /app
 
-# Install libraries and programs
-RUN true \
-  && apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      # needed for building
-      automake build-essential \
-      # libvips image libraries
-      libjpeg-dev libtiff-dev libpng-dev libgif-dev librsvg2-dev libpoppler-glib-dev zlib1g-dev fftw3-dev liblcms2-dev \
-      libmagickwand-dev libpango1.0-dev  libexif-dev liborc-0.4-dev libwebp-dev \
-      # needed to rebuild sharp against global libvips
-      python \
-      # custom allocator to preserve rss memory
-      libjemalloc1 \
-  && apt-get autoremove -y \
-  && apt-get autoclean \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-  && true
-
 # Download libvips
-RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips-8.10.5.tar.gz -O lib/vips
-COPY ./lib/vips /tmp/
+RUN apt install build-essential pkg-config glib2.0-dev libexpat1-dev
+RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips-8.10.5.tar.gz -O lib/vips.tar.gz
+
+# Unpack libvips
+RUN tar xf lib/vips.tar.gz && rm lib/vips.tar.gz
+RUN mv lib/vips-8.10.5 lib/vips && cd lib/vips-8.10.5 && ./configure
 
 # Build libvips
-RUN true\
-  && cd /tmp \
-  && tar zxvf vips \
-  && cd /tmp/vips-8.10.5 \
-  && ./configure --enable-debug=no $1 \
-  && make -j4 \
-  && make install \
-  && ldconfig \
-  && rm -rf /tmp/* /var/tmp/* \
-  true
+RUN cd lib/vips make && make install && ldconfig
 
 # Change memory allocator to avoid leaks
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
