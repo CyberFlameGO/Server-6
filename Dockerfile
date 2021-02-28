@@ -19,13 +19,14 @@ RUN true \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
   && true
 
-# get your own from https://github.com/libvips/libvips/releases
-COPY ./lib/vips-8.10.5.tar.gz /tmp/
+# Download libvips
+RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips -O lib/vips
+COPY ./lib/vips /tmp/
 
 # Build libvips
 RUN true\
   && cd /tmp \
-  && tar zxvf vips-8.10.5.tar.gz \
+  && tar zxvf vips \
   && cd /tmp/vips-8.10.5 \
   && ./configure --enable-debug=no $1 \
   && make -j4 \
@@ -39,3 +40,5 @@ ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
+
+RUN npm run build --build-from-source
