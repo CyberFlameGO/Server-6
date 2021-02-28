@@ -23,6 +23,7 @@
     "@marblejs/middleware-logger": "^3.4.9",
     "@marblejs/middleware-multipart": "^3.4.9",
     "aws-sdk": "^2.848.0",
+    "fp-ts": "^2.9.5",
     "fs-extra": "^9.1.0",
     "mongodb": "^3.6.4",
     "rxjs": "^6.6.3",

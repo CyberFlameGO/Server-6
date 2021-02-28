@@ -1,7 +1,13 @@
 FROM node:12
 
 WORKDIR /app
-COPY . /app
+ADD tsconfig.json .
+ADD tslint.json .
+ADD package.json .
+ADD package-lock.json .
+ADD src ./src
+ADD .env .
+
 
 # Download libvips
 # RUN apt update && apt-get -y install build-essential pkg-config glib2.0-dev libexpat1-dev
