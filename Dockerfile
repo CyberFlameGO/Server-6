@@ -26,3 +26,5 @@ RUN git clone https://github.com/SevenTV/Typings.git
 RUN npm install --build-from-source --also=dev
 RUN echo "{}" >> config.json
 RUN npm run build 
+
+CMD npm run start-container
