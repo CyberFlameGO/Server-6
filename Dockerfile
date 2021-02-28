@@ -13,9 +13,6 @@ RUN mv lib/vips-8.10.5 lib/vips && cd lib/vips && ./configure
 # Build libvips
 RUN cd lib/vips make && make install && ldconfig
 
-# Change memory allocator to avoid leaks
-ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
 
