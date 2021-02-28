@@ -1,6 +1,6 @@
 import { DataStructure } from '@typings/DataStructure';
 import { API } from '@typings/API';
-import { twitch_client_id } from 'Config';
+import { Config } from 'src/Config';
 import { iif, Observable, of, throwError } from 'rxjs';
 import { Constants } from 'src/Util/Constants';
 import superagent from 'superagent';
@@ -17,7 +17,7 @@ export class TwitchUser {
 		return new Observable<TwitchUser>(observer => {
 			superagent.get(`${Constants.TWITCH_API_BASE}/helix/users`)
 				.set('Authorization', `Bearer ${accessToken.access_token}`)
-				.set('Client-Id', twitch_client_id)
+				.set('Client-Id', Config.twitch_client_id)
 				.end((err, res) => {
 					if (err) return observer.error(err);
 

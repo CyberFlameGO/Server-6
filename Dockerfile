@@ -20,13 +20,13 @@ RUN true \
   && true
 
 # get your own from https://github.com/libvips/libvips/releases
-COPY ./lib/vips-8.7.3.tar.gz /tmp/
+COPY ./lib/vips-8.10.5.tar.gz /tmp/
 
 # Build libvips
 RUN true\
   && cd /tmp \
-  && tar zxvf vips-8.7.3.tar.gz \
-  && cd /tmp/vips-8.7.3 \
+  && tar zxvf vips-8.10.5.tar.gz \
+  && cd /tmp/vips-8.10.5 \
   && ./configure --enable-debug=no $1 \
   && make -j4 \
   && make install \
@@ -36,3 +36,11 @@ RUN true\
 
 # Change memory allocator to avoid leaks
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+# Install node packages
+WORKDIR /app
+RUN npm install
+
+# Build app
+ENV NODE_ENV=production
+RUN npm build

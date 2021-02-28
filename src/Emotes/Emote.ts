@@ -30,26 +30,25 @@ export class Emote {
 			const fileExtension = isAnimated ? 'gif' : 'png';
 			const originalSize = Array(2) as number[];
 
-			console.log(this.data.mime, 'mime');
 			this.ensureFilepath().pipe( // Read original image
 				switchMap(() => of(sharp(`${this.filepath}/og`, { animated: true }))),
 				switchMap(image => from(image.metadata()).pipe(map(meta => ({ meta, image })))),
-				tap(({ meta }) => {
+				tap(({ meta }) => { // Save original size
 					originalSize[0] = meta.width ?? 0;
+					// For multi-frame (gif) image, divide height by n pages, otherwise the height is totalled by the page count
 					originalSize[1] = (meta.pages ?? 1) > 1 ? (meta.height ?? 0) / (meta.pages ?? 0) : meta.height ?? 0;
-					console.log('og', originalSize, meta.pages, meta.height);
 				}),
 				switchMap(({ image, meta }) => from(sizes).pipe(
 					map(([scope, size]) => ({
 						scope,
 						meta,
-						size: this.getSizeRatio(originalSize, [size, size])
+						size: this.getSizeRatio(originalSize, [size, size]) // Get aspect ratio size
 					})),
 					concatMap(({ scope, size, meta }) => iif(() => isAnimated,
-						of(undefined).pipe(
-							switchMap(() => image.toFormat('gif', { pageHeight: size[1], force: true }).resize(size[0], size[1] * (meta.pages ?? 1)).toFile(`${this.filepath}/${scope}x.${fileExtension}`))
+						of(undefined).pipe( // Gif resize: set height to scope by n pages
+							switchMap(() => image.toFormat('gif', { pageHeight: size[1] }).resize(size[0], size[1] * (meta.pages ?? 1)).toFile(`${this.filepath}/${scope}x.${fileExtension}`))
 						),
-						of(undefined).pipe(
+						of(undefined).pipe( // Still resize
 							switchMap(() => image.resize(size[0], size[1], undefined).toFormat('png').toFile(`${this.filepath}/${scope}x.${fileExtension}`))
 						)
 					).pipe(mapTo((scope))))
@@ -68,6 +67,12 @@ export class Emote {
 		});
 	}
 
+	/**
+	 * Get the resized width/height of an image while keeping its aspect ratio
+	 *
+	 * @param og the original image size
+	 * @param nw the new image size
+	 */
 	getSizeRatio(og: number[], nw: number[]): number[] {
 		const ratio = Math.min(nw[0] / og[0], nw[1] / og[1]);
 

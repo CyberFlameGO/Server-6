@@ -1,5 +1,5 @@
 import { MongoClient, Collection } from 'mongodb';
-import { mongo_uri } from 'Config';
+import { Config } from 'src/Config';
 import { from, iif, Observable, of } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 import { DataStructure } from '@typings/DataStructure';
@@ -12,7 +12,7 @@ export class Mongo extends MongoClient {
 	}
 
 	constructor() {
-		super(mongo_uri, { useUnifiedTopology: true });
+		super(Config.mongo_uri, { useUnifiedTopology: true });
 
 		Mongo.instance = this;
 		// Connect to the database

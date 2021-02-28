@@ -5,7 +5,9 @@
   "main": "src/app.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ttsc --watch && node dist/app.js",
+    "start": "ttsc && node dist/app.js",
+    "start-container": "node dist/app.js",
+    "build": "ttsc",
     "watch": "ts-node-dev -r tsconfig-paths/register src/app.ts",
     "prisma": "prisma generate"
   },

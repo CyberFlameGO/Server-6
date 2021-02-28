@@ -1,6 +1,6 @@
 import { combineRoutes, r } from '@marblejs/core';
 import { generateToken } from '@marblejs/middleware-jwt';
-import { hostname, twitch_client_id, twitch_client_secret, tls, app_url, jwt_secret } from 'Config';
+import { Config } from 'src/Config';
 import { concatAll, map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { post } from 'superagent';
 import { asyncScheduler, Observable, scheduled } from 'rxjs';
@@ -21,7 +21,7 @@ namespace GetAuthURL {
 				body: {
 					url: ''.concat(
 						'https://id.twitch.tv/oauth2/authorize',
-						`?client_id=${twitch_client_id}`,
+						`?client_id=${Config.twitch_client_id}`,
 						`&redirect_uri=${redirectURI}`,
 						'&response_type=code'
 					)
@@ -29,7 +29,7 @@ namespace GetAuthURL {
 			})
 		))
 	);
-	export const redirectURI = `${tls ? 'https' : 'http'}://${hostname}/auth/callback`;
+	export const redirectURI = `${Config.tls ? 'https' : 'http'}://${Config.hostname}/auth/callback`;
 }
 
 
@@ -53,14 +53,14 @@ namespace AuthCallback {
 
 			// Generate a JWR
 			map(user => generateToken({
-				secret: Buffer.from(jwt_secret)
+				secret: Buffer.from(Config.jwt_secret)
 			})({
 				twid: user.data.id
 			})),
 			tap(tok => console.log(tok)),
 			map(jwt => ({
 				status: 301,
-				headers: { 'Location': `${app_url}/callback?token=${jwt}` }
+				headers: { 'Location': `${Config.app_url}/callback?token=${jwt}` }
 			}))
 		))
 	);
@@ -70,8 +70,8 @@ namespace AuthCallback {
 	export const ExchangeCode = (code: string): Observable<API.OAuth2.AuthCodeGrant> => {
 		return new Observable<API.OAuth2.AuthCodeGrant>(observer => {
 			const url = `${TwitchBase}/oauth2/token`.concat(
-				`?client_id=${twitch_client_id}`,
-				`&client_secret=${twitch_client_secret}`,
+				`?client_id=${Config.twitch_client_id}`,
+				`&client_secret=${Config.twitch_client_secret}`,
 				`&code=${code}`,
 				'&grant_type=authorization_code',
 				`&redirect_uri=${GetAuthURL.redirectURI}`

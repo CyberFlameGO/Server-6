@@ -1,5 +1,5 @@
 import { combineRoutes, r, use } from '@marblejs/core';
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { DataStructure } from '@typings/DataStructure';
 import { multipart$ } from '@marblejs/middleware-multipart';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -7,17 +7,17 @@ import { EmoteStore } from 'src/Emotes/EmoteStore';
 const MockData = [
 	{
 		name: 'xqcL',
-		submitted_by: 'Your Mom',
+		owner: 'Your Mom',
 		url: 'https://cdn.discordapp.com/emojis/797197297675010071.gif?v=1&size=32'
 	},
 	{
 		name: 'PagMan',
-		submitted_by: 'Your Mom',
+		owner: 'Your Mom',
 		url: 'https://cdn.discordapp.com/emojis/732824111788851222.png?v=1&size=32'
 	},
 	{
 		name: 'FeelsOkayMan',
-		submitted_by: 'Your Mom',
+		owner: 'Your Mom',
 		url: 'https://cdn.discordapp.com/emojis/695171992688787518.png?v=1&size=32'
 	}
 ] as DataStructure.Emote[];
@@ -35,6 +35,20 @@ const GetChannelEmotes = r.pipe(
 			console.log(req.params);
 			return { body: MockData };
 		})
+	))
+);
+
+/**
+ * GET /emotes
+ * Query: {  }
+ *
+ * Get a list of public emotes
+ */
+const GetEmotes = r.pipe(
+	r.matchPath('/'),
+	r.matchType('GET'),
+	r.useEffect(req$ => req$.pipe(
+
 	))
 );
 

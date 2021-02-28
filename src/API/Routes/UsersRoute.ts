@@ -3,13 +3,13 @@ import { authorize$ } from '@marblejs/middleware-jwt';
 import { of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
-import { jwt_secret } from 'Config';
+import { Config } from 'src/Config';
 
 const GetCurrentUserRoute = r.pipe(
 	r.matchPath('/@me'),
 	r.matchType('GET'),
 	r.use(authorize$({
-		secret: jwt_secret
+		secret: Config.jwt_secret
 	}, (payload: { twid: string }) => of({ twid: payload.twid }))),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<unknown, { user: string}>),
