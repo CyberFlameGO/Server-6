@@ -37,10 +37,5 @@ RUN true\
 # Change memory allocator to avoid leaks
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
-# Install node packages
-WORKDIR /workspace
-RUN npm install
-
 # Build app
 ENV NODE_ENV=production
-RUN npm build
