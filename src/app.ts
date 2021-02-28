@@ -1,10 +1,7 @@
-import { readdirSync, existsSync, rmdirSync } from 'fs';
-import {} from 'rxjs';
+import { readdirSync, existsSync, writeFileSync, rmdirSync } from 'fs';
+import { noop } from 'rxjs';
 import {} from 'rxjs/operators';
-import { Config } from 'src/Config';
-import { Mongo } from 'src/Db/Mongo';
-
-import('src/Client/Client');
+import { HttpListener } from 'src/API/HttpListener';
 
 if (existsSync('tmp/')) {
 	for (const dir of readdirSync('tmp/')) {
@@ -12,8 +9,11 @@ if (existsSync('tmp/')) {
 	}
 }
 
-new Mongo();
 
+!existsSync('config.json')
+	? writeFileSync('config.json', '{}', 'utf8')
+	: noop();
+import { Config } from 'src/Config';
 // Import config nodes from environment?
 {
 	const keys = Object.keys(process.env).filter(k => k.startsWith('cfg_'));
@@ -23,3 +23,7 @@ new Mongo();
 		(Config as any)[qualifiedKey] = process.env[k];
 	}
 }
+
+import { Mongo } from 'src/Db/Mongo';
+new Mongo();
+new HttpListener().listen();
