@@ -38,7 +38,7 @@ RUN true\
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 # Install node packages
-WORKDIR /app
+WORKDIR /workspace
 RUN npm install
 
 # Build app
