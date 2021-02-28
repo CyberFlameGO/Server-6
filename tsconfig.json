@@ -13,7 +13,7 @@
 
         "paths": {
             "src/*": ["./src/*"],
-			"@typings/*": ["../Shared/typings/*"],
+			"@typings/*": ["../Shared/typings/*", "Typings/typings/*"],
 			"@Config": ["./config.json"]
         },
         "plugins": [
