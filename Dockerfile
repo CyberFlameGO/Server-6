@@ -17,4 +17,5 @@ RUN cd lib/vips make && make install && ldconfig
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
 
-RUN npm run build --build-from-source
+RUN npm installl --build-from-source --dev
+RUN npm run build 
