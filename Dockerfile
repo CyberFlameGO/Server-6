@@ -1,5 +1,7 @@
 FROM node:12-slim
 
+WORKDIR /app
+
 # Install libraries and programs
 RUN true \
   && apt-get update \
@@ -20,7 +22,7 @@ RUN true \
   && true
 
 # Download libvips
-RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips -O lib/vips
+RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips-8.10.5.tar.gz -O lib/vips
 COPY ./lib/vips /tmp/
 
 # Build libvips
