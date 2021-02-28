@@ -37,5 +37,8 @@ RUN true\
 # Change memory allocator to avoid leaks
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
+# Install node packages
+RUN npm install --build-from-source
+
 # Build app
-RUN git clone https://github.com/SevenTV/Typings.git
+RUN npm build
