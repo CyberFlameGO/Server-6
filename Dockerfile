@@ -3,7 +3,7 @@ FROM node:12
 WORKDIR /app
 
 # Download libvips
-RUN apt update && apt install build-essential pkg-config glib2.0-dev libexpat1-dev
+RUN apt update && apt-get -y install build-essential pkg-config glib2.0-dev libexpat1-dev
 RUN mkdir -p lib/ && wget https://github.com/libvips/libvips/releases/download/v8.10.5/vips-8.10.5.tar.gz -O lib/vips.tar.gz
 
 # Unpack libvips
