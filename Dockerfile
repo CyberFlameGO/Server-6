@@ -36,3 +36,6 @@ RUN true\
 
 # Change memory allocator to avoid leaks
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+# Clone typings repo
+RUN git clone https://github.com/SevenTV/Typings.git
