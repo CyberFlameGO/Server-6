@@ -17,5 +17,6 @@ COPY . /app
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
 
-RUN npm install --build-from-source --dev
+RUN npm install --build-from-source --also=dev
+RUN run echo "{}" >> config.json
 RUN npm run build 
