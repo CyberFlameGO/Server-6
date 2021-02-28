@@ -29,7 +29,7 @@ namespace GetAuthURL {
 			})
 		))
 	);
-	export const redirectURI = `${Config.tls ? 'https' : 'http'}://${Config.hostname}/auth/callback`;
+	export const redirectURI = `${Config.tls ? 'https' : 'http'}://${Config.hostname}${Config.port !== 80 ? `:${Config.port ?? 3000}` : ''}/auth/callback`;
 }
 
 

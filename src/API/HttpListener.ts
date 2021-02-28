@@ -6,6 +6,7 @@ import { EmotesRoute } from 'src/API/Routes/EmotesRoute';
 import { AuthRoute } from 'src/API/Routes/AuthRoute';
 import { cors$ } from '@marblejs/middleware-cors';
 import { UsersRoute } from 'src/API/Routes/UsersRoute';
+import { Config } from 'src/Config';
 
 export class HttpListener {
 	setMiddlewares(): HttpMiddlewareEffect[] {
@@ -32,8 +33,8 @@ export class HttpListener {
 		});
 
 		const server = createServer({
-			port: 3000,
-			hostname: 'localhost',
+			port: Config.port,
+			hostname: Config.hostname,
 			listener
 		});
 
