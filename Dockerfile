@@ -1,6 +1,7 @@
 FROM node:12
 
 WORKDIR /app
+COPY . /app
 
 # Download libvips
 RUN apt update && apt-get -y install build-essential pkg-config glib2.0-dev libexpat1-dev
