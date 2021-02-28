@@ -1,4 +1,4 @@
-import { createServer, httpListener, HttpMiddlewareEffect } from '@marblejs/core';
+import { createServer, httpListener, HttpMiddlewareEffect, r } from '@marblejs/core';
 import { logger$ } from '@marblejs/middleware-logger';
 import { bodyParser$ } from '@marblejs/middleware-body';
 import { RootRoute } from 'src/API/Routes/RootRoute';
@@ -7,6 +7,9 @@ import { AuthRoute } from 'src/API/Routes/AuthRoute';
 import { cors$ } from '@marblejs/middleware-cors';
 import { UsersRoute } from 'src/API/Routes/UsersRoute';
 import { Config } from 'src/Config';
+import { authorize$ } from '@marblejs/middleware-jwt';
+import { of } from 'fp-ts/lib/Option';
+import { toRecord } from 'fp-ts/lib/ReadonlyRecord';
 
 export class HttpListener {
 	setMiddlewares(): HttpMiddlewareEffect[] {

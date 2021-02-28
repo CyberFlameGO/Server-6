@@ -49,15 +49,14 @@ namespace AuthCallback {
 				user.writeUser(),
 				user.writeToken()
 			], asyncScheduler).pipe(concatAll())), // Update (or create) user & token grant in the DB
-			tap(x => console.log(x)),
 
 			// Generate a JWR
 			map(user => generateToken({
 				secret: Buffer.from(Config.jwt_secret)
 			})({
+				id: user.id,
 				twid: user.data.id
 			})),
-			tap(tok => console.log(tok)),
 			map(jwt => ({
 				status: 301,
 				headers: { 'Location': `${Config.app_url}/callback?token=${jwt}` }
@@ -78,7 +77,6 @@ namespace AuthCallback {
 			);
 
 			post(url, (err: Error, res) => {
-				console.log(err);
 				if (err) return observer.error(err);
 
 				observer.next(res.body as API.OAuth2.AuthCodeGrant);

@@ -4,17 +4,20 @@ import { ObjectId } from 'mongodb';
 import { existsSync, mkdirp } from 'fs-extra';
 import { from, iif, Observable, of, scheduled } from 'rxjs';
 import { concatMap, delay, map, mapTo, switchMap, take, tap } from 'rxjs/operators';
+import { Mongo } from 'src/Db/Mongo';
 
 export class Emote {
-	fileID = new ObjectId();
+	id: ObjectId;
 
 	/**
 	 * A utility for creating a new emote
 	 */
-	constructor(public data: Partial<DataStructure.Emote>) {}
+	constructor(public data: Partial<DataStructure.Emote>) {
+		this.id = ObjectId.isValid(this.data?._id ?? '') ? this.data._id as ObjectId : new ObjectId();
+	}
 
 	get filepath(): string {
-		return `tmp/${this.fileID.toHexString()}`;
+		return `tmp/${this.id.toHexString()}`;
 	}
 
 	/**
@@ -68,6 +71,27 @@ export class Emote {
 	}
 
 	/**
+	 * Write this emote to database, creating it if it doesn't yet exist
+	 */
+	write(): Observable<Emote> {
+		return new Observable<Emote>(observer => {
+			Mongo.Get().collection('emotes').pipe(
+				switchMap(col => col.updateOne({
+					_id: this.id
+				}, {
+					$set: this.resolve()
+				}, { upsert: true })),
+
+				mapTo(this),
+				tap(emote => observer.next(emote))
+			).subscribe({
+				error(err) { observer.error(err); },
+				complete() { observer.complete(); },
+			});
+		});
+	}
+
+	/**
 	 * Get the resized width/height of an image while keeping its aspect ratio
 	 *
 	 * @param og the original image size
@@ -84,10 +108,12 @@ export class Emote {
 	 */
 	ensureFilepath(): Observable<void> {
 		return new Observable<void>(observer => {
-			of(existsSync(`tmp/${this.fileID}`)).pipe(
+			of(existsSync(`tmp/${this.id}`)).pipe(
 				switchMap(exists => iif(() => exists,
 					of(undefined),
-					mkdirp(this.filepath)
+					of(undefined).pipe(
+						switchMap(() => mkdirp(this.filepath))
+					)
 				))
 			).subscribe({
 				next() { observer.next(undefined); },
@@ -95,6 +121,16 @@ export class Emote {
 				error(err) { observer.error(err); }
 			});
 		});
+	}
+
+	resolve(): DataStructure.Emote {
+		return {
+			_id: this.id,
+			name: this.data.name ?? '',
+			private: this.data.private,
+			mime: this.data.mime,
+			owner: this.data.owner
+		};
 	}
 }
 

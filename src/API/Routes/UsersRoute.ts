@@ -4,19 +4,21 @@ import { of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { Config } from 'src/Config';
+import { ObjectId } from 'bson';
+import { API } from '@typings/API';
 
 const GetCurrentUserRoute = r.pipe(
 	r.matchPath('/@me'),
 	r.matchType('GET'),
 	r.use(authorize$({
 		secret: Config.jwt_secret
-	}, (payload: { twid: string }) => of({ twid: payload.twid }))),
+	}, (payload: API.TokenPayload) => of({ id: payload.id, twid: payload.twid }))),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<unknown, { user: string}>),
 
 		switchMap(req => Mongo.Get().collection('users').pipe(map(col => ({ req, col })))),
 		switchMap(({ col, req }) => col.findOne({
-			id: req.user?.twid
+			_id: ObjectId.createFromHexString(req.user?.id)
 		})),
 		map(user => ({ body: { ...user } }))
 	))

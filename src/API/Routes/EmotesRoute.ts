@@ -1,24 +1,31 @@
 import { combineRoutes, r, use } from '@marblejs/core';
-import { map, switchMap } from 'rxjs/operators';
+import { map, switchMap, tap } from 'rxjs/operators';
 import { DataStructure } from '@typings/DataStructure';
 import { multipart$ } from '@marblejs/middleware-multipart';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
+import { noop, of } from 'rxjs';
+import { authorize$ } from '@marblejs/middleware-jwt';
+import { Config } from 'src/Config';
+import { Emote } from 'src/Emotes/Emote';
+import { basename, extname } from 'path';
+import { API } from '@typings/API';
+import { ObjectId } from 'mongodb';
 
 const MockData = [
 	{
 		name: 'xqcL',
 		owner: 'Your Mom',
-		url: 'https://cdn.discordapp.com/emojis/797197297675010071.gif?v=1&size=32'
+		// url: 'https://cdn.discordapp.com/emojis/797197297675010071.gif?v=1&size=32'
 	},
 	{
 		name: 'PagMan',
 		owner: 'Your Mom',
-		url: 'https://cdn.discordapp.com/emojis/732824111788851222.png?v=1&size=32'
+		// url: 'https://cdn.discordapp.com/emojis/732824111788851222.png?v=1&size=32'
 	},
 	{
 		name: 'FeelsOkayMan',
 		owner: 'Your Mom',
-		url: 'https://cdn.discordapp.com/emojis/695171992688787518.png?v=1&size=32'
+		// url: 'https://cdn.discordapp.com/emojis/695171992688787518.png?v=1&size=32'
 	}
 ] as DataStructure.Emote[];
 
@@ -60,22 +67,32 @@ const GetEmotes = r.pipe(
 const CreateEmote = r.pipe(
 	r.matchPath('/'),
 	r.matchType('POST'),
+	r.use(authorize$({ // Authenticate the user
+		secret: Config.jwt_secret
+	}, (payload: API.TokenPayload) => of({ id: payload.id, twid: payload.twid }))),
 	r.useEffect(req$ => req$.pipe(
-		use(multipart$({
-			stream: ({ file, encoding, mimetype, filename, fieldname  }) => {
-				console.log(encoding, mimetype, filename, fieldname);
-				return EmoteStore.Get().create(file, {
-					mime: mimetype,
-					submitter: 'Your Mom'
-				}).pipe(
-					map(emote => ({ destination: `${emote.filepath}/og` }))
-				);
-			}
-		})),
-		map(() => ({
-			body: {
-				very: 'pog'
-			}
+		switchMap(req => of(req).pipe(
+			use(multipart$({ // Get multipart file
+				stream: ({ file, encoding, mimetype, filename, fieldname  }) => {
+					console.log(encoding, mimetype, filename, fieldname, req.user);
+					return EmoteStore.Get().create(file, {
+						mime: mimetype,
+						name: basename(filename, extname(filename)),
+						owner: ObjectId.createFromHexString(req.user.id)
+					}).pipe(
+						tap(emote => req.meta ? req.meta.emote = emote : noop()), // Stick emote to request meta
+						map(emote => ({ destination: `${emote.filepath}/og` })),
+					);
+				}
+			})),
+			tap(x => console.log(x.meta)),
+			map(req => ({
+				req,
+				emote: req.meta?.emote as Emote
+			}))
+		)),
+		map(({ emote, req }) => ({
+			body: emote.resolve()
 		}))
 	))
 );

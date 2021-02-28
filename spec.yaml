@@ -1,0 +1,42 @@
+name: seventv-server
+region: ams
+services:
+- envs:
+  - key: cfg_s3_endpoint
+    scope: RUN_AND_BUILD_TIME
+    value: https://ams3.digitaloceanspaces.com
+  - key: cfg_s3_bucket_name
+    scope: RUN_AND_BUILD_TIME
+    value: 7tv
+  - key: cfg_twitch_client_id
+    scope: RUN_AND_BUILD_TIME
+    value: wglrcd55waquikrkatyigdg1vqvmws
+  - key: cfg_jwt_secret
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:uchzG+ihfE2zvafYBVG92Rrlght01XIU:PXwTEtus04tblopWCEaxodYHlza1Gvokj6ectWq9KmUijB8QJscNlX9pqOzacdOhyejauHj48LNUUunCFNc1zUBQBwYbUjmzH+imKeq/y2ad6MnIWLQTokg/GpujOwTQB9PT0FFBv+FoFpHzfVHxOv2id3G1EMqbT8bbf9nZ3f8IMU2RKf+s/FCmohhWqELY/U7XogBVhXhShXucEqAjvnOQ20aQUI8lf2362ErKLfh/s7xNmv7Ltk8E2q5OVa86xzAacOnWX4o3Xmh1CmXBJhbLf8j9OCPJcXDrJhF+8IU4eMEuf/HNcqQNeHSX0rID+rgW3wdmBIs=]
+  - key: cfg_s3_access_key
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:KGlSYaO5dfL0UDxzfKM3y4wpeBHGlFen:fIuc4jE85i1js34sO3wFJzvqEFkp1ng4GtblEfEogDu1ALjE]
+  - key: cfg_s3_secret
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:QKMRg4hcZBw+qybXaFLTSIELgA0fuXmO:XqNutURBT4cO206vHI4GF275PMlTpy5ln0JKShxXR81IrlMiDt4qFj5dPUoA6h+RqdMlGLT1e3kWyes=]
+  - key: cfg_twitch_client_secret
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:R3TehHVOsS9XfPFiVCIRbdtbOHA/0fz3:nmrD6W1vF/M0RsyDITkZyJWi9HzLxJxmAG+SllTIXsaAcl+y1Kpc5bx4FaZL8Q==]
+  github:
+    branch: master
+    deploy_on_push: true
+    repo: SevenTV/Server
+  http_port: 80
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  name: seventv-server
+  routes:
+  - path: /
+  run_command: npm run start
+  source_dir: /
+  dockerfile_path: Dockerfile

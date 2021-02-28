@@ -1,14 +1,15 @@
-import { DataStructure } from '@typings/DataStructure';
+import { DataStructure, MongoDocument } from '@typings/DataStructure';
 import { API } from '@typings/API';
 import { Config } from 'src/Config';
-import { iif, Observable, of, throwError } from 'rxjs';
 import { Constants } from 'src/Util/Constants';
-import superagent from 'superagent';
 import { Mongo } from 'src/Db/Mongo';
-import { switchMap, tap } from 'rxjs/operators';
-
+import { mapTo, mergeAll, pluck, switchMap, take, tap } from 'rxjs/operators';
+import { ObjectId } from 'mongodb';
+import { from, iif, Observable, of, throwError } from 'rxjs';
+import superagent from 'superagent';
 
 export class TwitchUser {
+	id: ObjectId | (null | undefined) = null;
 	private grant: API.OAuth2.AuthCodeGrant | null = null;
 
 	constructor(public data: DataStructure.TwitchUser) {}
@@ -82,13 +83,19 @@ export class TwitchUser {
 		return new Observable(observer => {
 			if (!this.data) return observer.error(Error('Cannot write unitialized user'));
 
-			Mongo.Get().collection('users').pipe(
-				switchMap(col => col.updateOne({
-					id: this.data.id
+			const col = Mongo.Get().collection('users');
+			col.pipe(
+				switchMap(col => from(col.updateOne({
+					id: this.data.id // Resolve user by their Twitch ID
 				}, {
 					$set: { ...this.data }
-				}, { upsert: true })),
+				}, { upsert: true })).pipe(mapTo(col))),
 
+				// Get user's app ID
+				switchMap(col => col.find({ id: this.data.id }, { projection: ['_id'] }).toArray() as Promise<MongoDocument[]>),
+				mergeAll(),
+				take(1), pluck('_id'), // Emit only _id field
+				tap(id => this.id = id),
 				tap(() => observer.next(this))
 			).subscribe({
 				complete() { observer.complete(); },
