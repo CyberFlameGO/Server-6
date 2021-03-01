@@ -10,6 +10,7 @@ import { Emote } from 'src/Emotes/Emote';
 import { basename, extname } from 'path';
 import { API } from '@typings/API';
 import { ObjectId } from 'mongodb';
+import { Mongo } from 'src/Db/Mongo';
 
 const MockData = [
 	{
@@ -55,7 +56,11 @@ const GetEmotes = r.pipe(
 	r.matchPath('/'),
 	r.matchType('GET'),
 	r.useEffect(req$ => req$.pipe(
-
+		switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
+		switchMap(({ req, col }) => col.find({  }).limit(200).toArray()),
+		map(emotes => ({
+			body: emotes
+		}))
 	))
 );
 
@@ -85,7 +90,6 @@ const CreateEmote = r.pipe(
 					);
 				}
 			})),
-			tap(x => console.log(x.meta)),
 			map(req => ({
 				req,
 				emote: req.meta?.emote as Emote
@@ -98,6 +102,7 @@ const CreateEmote = r.pipe(
 );
 
 export const EmotesRoute = combineRoutes('/emotes', [
+	GetEmotes,
 	CreateEmote,
 	GetChannelEmotes
 ]);

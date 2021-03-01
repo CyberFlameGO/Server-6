@@ -2,8 +2,8 @@ import { DataStructure } from '@typings/DataStructure';
 import sharp from 'sharp';
 import { ObjectId } from 'mongodb';
 import { existsSync, mkdirp } from 'fs-extra';
-import { from, iif, Observable, of, scheduled } from 'rxjs';
-import { concatMap, delay, map, mapTo, switchMap, take, tap } from 'rxjs/operators';
+import { EMPTY, from, iif, Observable, of, queueScheduler, scheduled } from 'rxjs';
+import { concatAll, concatMap, map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 
 export class Emote {
@@ -26,9 +26,9 @@ export class Emote {
 	resize(): Observable<Emote.Resized> {
 		return new Observable<Emote.Resized>(observer => {
 			// Define emotes sizes
-			// array elements - 0: scope, 1: size (px)
+			// array elements - 0: scope, 1: width (px), height (px)
 			// Needs to be in descending order or it will look scuffed
-			const sizes = [[4, 128], [3, 76], [2, 48], [1, 32]];
+			const sizes = [[4, 384, 128], [3, 228, 76], [2, 144, 48], [1, 96, 32]];
 			const isAnimated = this.data.mime === 'image/gif';
 			const fileExtension = isAnimated ? 'gif' : 'png';
 			const originalSize = Array(2) as number[];
@@ -42,10 +42,10 @@ export class Emote {
 					originalSize[1] = (meta.pages ?? 1) > 1 ? (meta.height ?? 0) / (meta.pages ?? 0) : meta.height ?? 0;
 				}),
 				switchMap(({ image, meta }) => from(sizes).pipe(
-					map(([scope, size]) => ({
+					map(([scope, width, height]) => ({
 						scope,
 						meta,
-						size: this.getSizeRatio(originalSize, [size, size]) // Get aspect ratio size
+						size: this.getSizeRatio(originalSize, [width, height]) // Get aspect ratio size
 					})),
 					concatMap(({ scope, size, meta }) => iif(() => isAnimated,
 						of(undefined).pipe( // Gif resize: set height to scope by n pages
@@ -75,15 +75,26 @@ export class Emote {
 	 */
 	write(): Observable<Emote> {
 		return new Observable<Emote>(observer => {
-			Mongo.Get().collection('emotes').pipe(
-				switchMap(col => col.updateOne({
-					_id: this.id
-				}, {
-					$set: this.resolve()
-				}, { upsert: true })),
+			scheduled([
+				Mongo.Get().collection('users').pipe(
+					switchMap(col => col.findOne({ _id: new ObjectId(this.data.owner) })),
+					tap(user => this.data.owner_name = user?.display_name),
+					mapTo(EMPTY)
+				),
 
-				mapTo(this),
-				tap(emote => observer.next(emote))
+				Mongo.Get().collection('emotes').pipe(
+					// Get user's display name
+					switchMap(col => col.updateOne({
+						_id: this.id
+					}, {
+						$set: this.resolve()
+					}, { upsert: true })),
+
+					mapTo(this),
+					tap(emote => observer.next(emote))
+				)
+			], queueScheduler).pipe(
+				concatAll()
 			).subscribe({
 				error(err) { observer.error(err); },
 				complete() { observer.complete(); },
@@ -129,8 +140,13 @@ export class Emote {
 			name: this.data.name ?? '',
 			private: this.data.private,
 			mime: this.data.mime,
-			owner: this.data.owner
+			owner: this.data.owner,
+			owner_name: this.data.owner_name
 		};
+	}
+
+	toString(): string {
+		return `${this.data.name} (ID: ${this.id})`;
 	}
 }
 

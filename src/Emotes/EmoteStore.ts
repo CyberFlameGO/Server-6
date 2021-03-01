@@ -5,6 +5,7 @@ import { asyncScheduler, fromEvent, noop, Observable, scheduled, throwError, of,
 import { map, mapTo, mergeAll, mergeMap, switchMap, take, tap, toArray } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
+import { Logger } from 'src/Util/Logger';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
@@ -41,10 +42,11 @@ export class EmoteStore {
 					tap(stream => data.pipe(stream)),
 					switchMap(stream => fromEvent(stream, 'finish').pipe(take(1)))
 				)), // Write uploaded emote to file
-				tap(x => console.log('Stream end')),
+				tap(() => Logger.Get().info(`Uploading emote '${emote.data.name}'`)),
 
 				// Write to database
 				switchMap(() => emote.write()),
+				tap(() => Logger.Get().info(`<EmoteStore> Wrote '${emote.data.name}' to DB`)),
 
 				// Create all the emote sizes
 				switchMap(() => emote.resize()),
@@ -52,12 +54,13 @@ export class EmoteStore {
 				// Upload sizes to DigitalOcean
 				mergeMap(resized => this.s3.putObject({
 					Bucket: Config.s3_bucket_name,
-					Key: `emote/${emote.id}/${resized.scope}x.${resized.extension}`,
+					Key: `${process.env.NODE_ENV === 'production' ? '' : 'dev/'}emote/${emote.id}/${resized.scope}x`,
 					Body: createReadStream(resized.path),
 					ContentType: options.mime,
 					ACL: 'public-read'
 				})),
 				toArray(),
+				tap(() => Logger.Get().info(`<EmoteStore> Uploaded '${emote.data.name}' to CDN!`)),
 				mapTo(emote)
 			).subscribe({
 				next(emote: any) { observer.next(emote); },
