@@ -1,9 +1,9 @@
-import { combineRoutes, r, use } from '@marblejs/core';
-import { map, switchMap, tap } from 'rxjs/operators';
+import { combineRoutes, HttpRequest, r, use } from '@marblejs/core';
+import { map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { DataStructure } from '@typings/DataStructure';
 import { multipart$ } from '@marblejs/middleware-multipart';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
-import { noop, of } from 'rxjs';
+import { from, iif, noop, of, throwError } from 'rxjs';
 import { authorize$ } from '@marblejs/middleware-jwt';
 import { Config } from 'src/Config';
 import { Emote } from 'src/Emotes/Emote';
@@ -36,7 +36,7 @@ const MockData = [
  * List emotes for a speficic channel
  */
 const GetChannelEmotes = r.pipe(
-	r.matchPath('/:channel'),
+	r.matchPath('/ch/:channel'),
 	r.matchType('GET'),
 	r.useEffect(req$ => req$.pipe(
 		map(req => {
@@ -46,21 +46,83 @@ const GetChannelEmotes = r.pipe(
 	))
 );
 
+namespace GetEmotes {
+	/**
+	 * GET /emotes
+	 * Query: {  }
+	 *
+	 * Get a list of public emotes
+	 */
+	export const Route = r.pipe(
+		r.matchPath('/'),
+		r.matchType('GET'),
+		r.useEffect(req$ => req$.pipe(
+			map(req => req as HttpRequest<unknown, unknown, Query>),
+			switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
+			switchMap(x => from(x.col.estimatedDocumentCount({})).pipe(map(totalEstimatedSize => ({ totalEstimatedSize, ...x })))),
+			switchMap(({ req, col, totalEstimatedSize }) => { // Begin pagination
+				const page = parseInt(req.query.page ?? 1); // The requested page (1 if unset)
+				const pageSize = parseInt(req.query.pageSize ?? 16); // The requested size of the page (amount of documents to show)
+				const skip = (page - 1) * pageSize; // How many documents should be skipped in order to reach the requested range
+
+				return col.aggregate([ // Create aggregation pipeline
+					{ $match: {} },
+					{ $skip: skip },
+					{ $limit: pageSize }
+				]).toArray().then(emotes => ({ emotes, totalEstimatedSize }));
+			}),
+			map(({ emotes, totalEstimatedSize}) => ({
+				body: {
+					total_estimated_size: totalEstimatedSize,
+					emotes
+				}
+			}))
+		))
+	);
+
+	interface Query {
+		page: string;
+		pageSize: string;
+	}
+}
+
+
 /**
- * GET /emotes
- * Query: {  }
+ * GET /emotes/:emote
  *
- * Get a list of public emotes
+ * Get a single emote
  */
-const GetEmotes = r.pipe(
-	r.matchPath('/'),
+export const GetEmote = r.pipe(
+	r.matchPath('/:emote'),
 	r.matchType('GET'),
 	r.useEffect(req$ => req$.pipe(
+		tap(req => console.log(req.params)),
 		switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
-		switchMap(({ req, col }) => col.find({  }).limit(200).toArray()),
-		map(emotes => ({
-			body: emotes
+		switchMap(({ req, col }) => col.findOne({ _id: ObjectId.createFromHexString((req.params as any).emote) })),
+		switchMap(emote => !!emote ? of(emote) : throwError('Unknown Emote')),
+		map(emote => ({
+			body: emote
 		}))
+	))
+);
+
+export const DeleteEmote = r.pipe(
+	r.matchPath('/:emote'),
+	r.matchType('DELETE'),
+	r.use(authorize$({ // Authenticate the user
+		secret: Config.jwt_secret
+	}, (payload: API.TokenPayload) => of({ id: ObjectId.createFromHexString(payload.id), twid: payload.twid }))),
+	r.useEffect(req$ => req$.pipe(
+		switchMap(req => ObjectId.isValid((req.params as any).emote) ? of(req) : throwError(Error('Invalid Emote ID'))),
+		switchMap(req => EmoteStore.Get().findEmote((req.params as any).emote).pipe(
+			map(emote => ({ emote, req }))
+		)),
+		tap(e => console.log(e.emote)),
+		switchMap(({ req, emote }) => iif(() => ObjectId.isValid(String(emote.data.owner)) && new ObjectId(emote.data.owner).equals(req.user.id),
+			emote.delete(),
+			throwError(Error('You are not permitted to do this'))
+		)),
+		mapTo({ body: {} })
 	))
 );
 
@@ -78,8 +140,7 @@ const CreateEmote = r.pipe(
 	r.useEffect(req$ => req$.pipe(
 		switchMap(req => of(req).pipe(
 			use(multipart$({ // Get multipart file
-				stream: ({ file, encoding, mimetype, filename, fieldname  }) => {
-					console.log(encoding, mimetype, filename, fieldname, req.user);
+				stream: ({ file, mimetype, filename }) => {
 					return EmoteStore.Get().create(file, {
 						mime: mimetype,
 						name: basename(filename, extname(filename)),
@@ -102,7 +163,9 @@ const CreateEmote = r.pipe(
 );
 
 export const EmotesRoute = combineRoutes('/emotes', [
-	GetEmotes,
+	GetEmotes.Route,
+	GetEmote,
+	DeleteEmote,
 	CreateEmote,
 	GetChannelEmotes
 ]);

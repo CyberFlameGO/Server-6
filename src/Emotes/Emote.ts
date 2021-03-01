@@ -5,6 +5,9 @@ import { existsSync, mkdirp } from 'fs-extra';
 import { EMPTY, from, iif, Observable, of, queueScheduler, scheduled } from 'rxjs';
 import { concatAll, concatMap, map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
+import { EmoteStore } from 'src/Emotes/EmoteStore';
+import { Config } from 'src/Config';
+import { Logger } from 'src/Util/Logger';
 
 export class Emote {
 	id: ObjectId;
@@ -130,6 +133,36 @@ export class Emote {
 				next() { observer.next(undefined); },
 				complete() { observer.complete(); },
 				error(err) { observer.error(err); }
+			});
+		});
+	}
+
+	/***
+	 * Delete this emote
+	 */
+	delete(): Observable<void> {
+		return new Observable<void>(observer => {
+			// Delete from CDN
+			from(EmoteStore.Get().s3.listObjects({ // List the emote's objects
+				Bucket: Config.s3_bucket_name,
+				Prefix: `${EmoteStore.getEmoteObjectKey(String(this.id))}`
+			})).pipe(
+				map(out => out.Contents ?? []), // Map to contents
+				switchMap(objects => EmoteStore.Get().s3.deleteObjects({ // Delete the objects retrieved
+					Bucket: Config.s3_bucket_name,
+					Delete: { Objects: [...objects.map(o => ({ Key: o.Key }))] }
+				})),
+				tap(x => Logger.Get().info(`<Emote> Deleted ${x.Deleted?.length} objects (${this})`)),
+
+				// OK: object deleted, proceed to removing the database entry
+				// TODO: Revoke emote from any channels that has it
+				switchMap(() => Mongo.Get().collection('emotes')),
+				switchMap(col => col.deleteOne({ _id: this.id })),
+				tap(() => Logger.Get().info(`<Emote> Deleted database entry (${this})`))
+			).subscribe({
+				complete() { observer.complete(); },
+				error(err) { console.log(err); observer.error(err); },
+				next() { observer.next(undefined); }
 			});
 		});
 	}

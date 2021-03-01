@@ -19,7 +19,7 @@ export class HttpListener {
 			cors$({
 				origin: '*',
 				allowHeaders: '*',
-				methods: ['GET', 'POST', 'PUT', 'PATCH']
+				methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 			})
 		];
 	}

@@ -1,11 +1,13 @@
 import { S3 } from '@aws-sdk/client-s3';
 import { Config } from 'src/Config';
 import { createWriteStream, createReadStream } from 'fs';
-import { asyncScheduler, fromEvent, noop, Observable, scheduled, throwError, of, EMPTY, from } from 'rxjs';
-import { map, mapTo, mergeAll, mergeMap, switchMap, take, tap, toArray } from 'rxjs/operators';
+import { fromEvent, Observable, of} from 'rxjs';
+import { filter, map, mapTo, mergeMap, switchMap, take, tap, toArray } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
 import { Logger } from 'src/Util/Logger';
+import { Mongo } from 'src/Db/Mongo';
+import { DataStructure } from '@typings/DataStructure';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
@@ -22,6 +24,14 @@ export class EmoteStore {
 		},
 		tls: true
 	});
+
+	findEmote(id: string): Observable<Emote> {
+		return Mongo.Get().collection('emotes').pipe(
+			switchMap(col => col.findOne({ _id: ObjectId.createFromHexString(id) })),
+			filter(x => x !== null),
+			map(data => new Emote(data as DataStructure.Emote))
+		);
+	}
 
 	/**
 	 * Create a new Emote
@@ -54,7 +64,7 @@ export class EmoteStore {
 				// Upload sizes to DigitalOcean
 				mergeMap(resized => this.s3.putObject({
 					Bucket: Config.s3_bucket_name,
-					Key: `${process.env.NODE_ENV === 'production' ? '' : 'dev/'}emote/${emote.id}/${resized.scope}x`,
+					Key: `${EmoteStore.getEmoteObjectKey(String(emote.id))}/${resized.scope}x`,
 					Body: createReadStream(resized.path),
 					ContentType: options.mime,
 					ACL: 'public-read'
@@ -68,6 +78,10 @@ export class EmoteStore {
 				error(err) { observer.error(err); }
 			}); // pog
 		});
+	}
+
+	static getEmoteObjectKey(emoteID: string): string {
+		return `${process.env.NODE_ENV === 'production' ? '' : 'dev/'}emote/${emoteID}`;
 	}
 }
 
