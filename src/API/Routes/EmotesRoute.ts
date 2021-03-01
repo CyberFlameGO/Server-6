@@ -138,27 +138,28 @@ const CreateEmote = r.pipe(
 		secret: Config.jwt_secret
 	}, (payload: API.TokenPayload) => of({ id: payload.id, twid: payload.twid }))),
 	r.useEffect(req$ => req$.pipe(
-		switchMap(req => of(req).pipe(
-			use(multipart$({ // Get multipart file
-				stream: ({ file, mimetype, filename }) => {
-					return EmoteStore.Get().create(file, {
-						mime: mimetype,
-						name: basename(filename, extname(filename)),
-						owner: ObjectId.createFromHexString(req.user.id)
-					}).pipe(
-						tap(emote => req.meta ? req.meta.emote = emote : noop()), // Stick emote to request meta
-						map(emote => ({ destination: `${emote.filepath}/og` })),
-					);
-				}
-			})),
-			map(req => ({
-				req,
-				emote: req.meta?.emote as Emote
-			}))
-		)),
-		map(({ emote, req }) => ({
-			body: emote.resolve()
-		}))
+		switchMap(req => req.response.send({ body: 'Endpoint is closed', status: 403 })),
+		// switchMap(req => of(req).pipe(
+		// 	use(multipart$({ // Get multipart file
+		// 		stream: ({ file, mimetype, filename }) => {
+		// 			return EmoteStore.Get().create(file, {
+		// 				mime: mimetype,
+		// 				name: basename(filename, extname(filename)),
+		// 				owner: ObjectId.createFromHexString(req.user.id)
+		// 			}).pipe(
+		// 				tap(emote => req.meta ? req.meta.emote = emote : noop()), // Stick emote to request meta
+		// 				map(emote => ({ destination: `${emote.filepath}/og` })),
+		// 			);
+		// 		}
+		// 	})),
+		// 	map(req => ({
+		// 		req,
+		// 		emote: req.meta?.emote as Emote
+		// 	}))
+		// )),
+		// map(({ emote, req }) => ({
+		// 	body: emote.resolve()
+		// }))
 	))
 );
 
