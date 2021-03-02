@@ -1,13 +1,13 @@
 import { S3 } from '@aws-sdk/client-s3';
 import { Config } from 'src/Config';
 import { createWriteStream, createReadStream } from 'fs';
-import { fromEvent, Observable, of} from 'rxjs';
-import { filter, map, mapTo, mergeMap, switchMap, take, tap, toArray } from 'rxjs/operators';
+import { fromEvent, iif, Observable, of, throwError} from 'rxjs';
+import { filter, map, mapTo, mergeMap, switchMap, take, takeLast, tap, toArray } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
 import { Logger } from 'src/Util/Logger';
 import { Mongo } from 'src/Db/Mongo';
-import { DataStructure } from '@typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
@@ -46,8 +46,16 @@ export class EmoteStore {
 			});
 
 			// Save to disk for applying changes
-			emote.ensureFilepath().pipe(
-				tap(() => console.log('filepath ensured')),
+			emote.validate().pipe(
+				filter(e => !e.valid),
+				map(e => e.error),
+				toArray(),
+				switchMap(errors => iif(() => errors.length > 0,
+					throwError(`There are problems with this emote: ${errors.map(e => e?.message).join(', ')}`),
+					of(undefined)
+				)),
+
+				switchMap(() => emote.ensureFilepath()),
 				switchMap(() => of(createWriteStream(`${emote.filepath}/og`)).pipe(
 					tap(stream => data.pipe(stream)),
 					switchMap(stream => fromEvent(stream, 'finish').pipe(take(1)))

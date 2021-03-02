@@ -13,7 +13,7 @@
 
         "paths": {
             "src/*": ["./src/*"],
-			"@typings/*": ["../Shared/typings/*", "Typings/typings/*", "node_modules/seventv-typings/typings/*"],
+			"@typings/*": ["../Shared/*", "Typings/*", "node_modules/seventv-typings/*"],
 			"@Config": ["./config.json"]
         },
         "plugins": [

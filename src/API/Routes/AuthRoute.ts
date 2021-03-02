@@ -1,11 +1,11 @@
 import { combineRoutes, r } from '@marblejs/core';
-import { generateToken } from '@marblejs/middleware-jwt';
 import { Config } from 'src/Config';
-import { concatAll, map, mapTo, switchMap, tap } from 'rxjs/operators';
+import { concatAll, map, mapTo, switchMap } from 'rxjs/operators';
 import { post } from 'superagent';
 import { asyncScheduler, Observable, scheduled } from 'rxjs';
-import { API } from '@typings/API';
+import { API } from '@typings/typings/API';
 import { TwitchUser } from 'src/Util/TwitchUser';
+import jwt from 'jsonwebtoken';
 
 namespace GetAuthURL {
 	/**
@@ -51,12 +51,10 @@ namespace AuthCallback {
 			], asyncScheduler).pipe(concatAll())), // Update (or create) user & token grant in the DB
 
 			// Generate a JWR
-			map(user => generateToken({
-				secret: Buffer.from(Config.jwt_secret)
-			})({
+			map(user => jwt.sign({
 				id: user.id,
 				twid: user.data.id
-			})),
+			}, Config.jwt_secret, { expiresIn: 604800 })),
 			map(jwt => ({
 				status: 301,
 				headers: { 'Location': `${Config.app_url}/callback?token=${jwt}` }

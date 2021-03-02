@@ -1,5 +1,5 @@
-import { DataStructure, MongoDocument } from '@typings/DataStructure';
-import { API } from '@typings/API';
+import { DataStructure, MongoDocument } from '@typings/typings/DataStructure';
+import { API } from '@typings/typings/API';
 import { Config } from 'src/Config';
 import { Constants } from 'src/Util/Constants';
 import { Mongo } from 'src/Db/Mongo';
@@ -7,12 +7,15 @@ import { mapTo, mergeAll, pluck, switchMap, take, tap } from 'rxjs/operators';
 import { ObjectId } from 'mongodb';
 import { from, iif, Observable, of, throwError } from 'rxjs';
 import superagent from 'superagent';
+import { Emote } from 'src/Emotes/Emote';
 
 export class TwitchUser {
 	id: ObjectId | (null | undefined) = null;
 	private grant: API.OAuth2.AuthCodeGrant | null = null;
 
-	constructor(public data: DataStructure.TwitchUser) {}
+	constructor(public data: DataStructure.TwitchUser) {
+		if (!!data._id && ObjectId.isValid(data._id)) this.id = new ObjectId(data._id);
+	}
 
 	static connect(accessToken: API.OAuth2.AuthCodeGrant): Observable<TwitchUser> {
 		return new Observable<TwitchUser>(observer => {
@@ -102,6 +105,10 @@ export class TwitchUser {
 				error(err) { observer.error(err); }
 			});
 		});
+	}
+
+	toString(): string {
+		return `${this.data.display_name} (${this.data.login}, ${this.data.id})`;
 	}
 }
 

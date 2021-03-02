@@ -2,7 +2,7 @@ import { MongoClient, Collection } from 'mongodb';
 import { Config } from 'src/Config';
 import { from, iif, Observable, of } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
-import { DataStructure } from '@typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure';
 
 export class Mongo extends MongoClient {
 	private DB_NAME = '7tv';

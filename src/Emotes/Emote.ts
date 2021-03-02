@@ -1,13 +1,15 @@
-import { DataStructure } from '@typings/DataStructure';
-import sharp from 'sharp';
+import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'mongodb';
 import { existsSync, mkdirp } from 'fs-extra';
-import { EMPTY, from, iif, Observable, of, queueScheduler, scheduled } from 'rxjs';
-import { concatAll, concatMap, map, mapTo, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError } from 'rxjs';
+import { concatAll, concatMap, defaultIfEmpty, filter, map, mapTo, mergeMap, switchMap, takeLast, tap, toArray } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
 import { Logger } from 'src/Util/Logger';
+import { TwitchUser } from 'src/Util/TwitchUser';
+import sharp from 'sharp';
+import { Constants } from '@typings/src/Constants';
 
 export class Emote {
 	id: ObjectId;
@@ -106,6 +108,52 @@ export class Emote {
 	}
 
 	/**
+	 * Update this emote
+	 */
+	update(options: Partial<Emote.UpdateOptions>, actor?: TwitchUser): Observable<Emote> {
+		return new Observable<Emote>(observer => {
+			const update = {} as any; // Final result (after being verified)
+
+			// Verify
+			from(Object.keys(options ?? {}) as (keyof Emote.UpdateOptions)[]).pipe(
+				mergeMap(key => {
+					const isOwner = ((!!this.data.owner && !!actor) && actor.id?.equals(this.data.owner)) ?? false;
+					const isMod = (actor?.data.rank ?? 0) >= Constants.Users.Rank.MODERATOR;
+					let test = false;
+					switch (key) {
+						case 'name': // Check name is correct
+							test = (isOwner || isMod) && this.isNameValid(options[key] as string);
+							break;
+						case 'owner': // Verify actor has the permission to transfer ownership away
+							test = isOwner || isMod;
+							break;
+						case 'global': // Verify actor is a moderator or higher
+							test = isMod;
+							break;
+					}
+
+					return of(({ key, test }));
+				}),
+				filter(({ test }) => test === true), // Only emit truthy keys
+				tap(({ key }) => update[key] = options[key]), // Set value to final object
+
+				toArray(), // Wait for all to be finished
+
+				switchMap(a => Mongo.Get().collection('emotes').pipe(map(col => ({ col, a })))),
+				switchMap(({ a, col }) => a.length ? col.findOneAndUpdate({ // Update the emote
+					_id: this.id
+				}, { $set: update }, { returnOriginal: false }) : throwError(Error('Nothing changed'))),
+				tap(data => data.ok && !!data.value ? this.data = data.value : noop()),
+				map(() => this as Emote)
+			).subscribe({
+				next(emote) { observer.next(emote); },
+				complete() { observer.complete(); },
+				error(err) { observer.error(err); }
+			});
+		});
+	}
+
+	/**
 	 * Get the resized width/height of an image while keeping its aspect ratio
 	 *
 	 * @param og the original image size
@@ -114,7 +162,42 @@ export class Emote {
 	getSizeRatio(og: number[], nw: number[]): number[] {
 		const ratio = Math.min(nw[0] / og[0], nw[1] / og[1]);
 
-		return [ og[0] * ratio, og[1] * ratio ].map(n => Math.floor(n));
+		return [og[0] * ratio, og[1] * ratio].map(n => Math.floor(n));
+	}
+
+	private isNameValid(value: string): boolean {
+		return Emote.EmoteNameRegExp.test(value as string)
+		&& (value as string).length < Emote.MAX_EMOTE_LENGTH && (value as string).length >= Emote.MIN_EMOTE_LENGTH;
+	}
+
+	/**
+	 * Validate the emote's data
+	 */
+	validate(): Observable<Emote.Validate.Emission> {
+		return new Observable<Emote.Validate.Emission>(observer => {
+			from(['name'] as (keyof DataStructure.Emote)[]).pipe(
+				map(key => ({ // Iterate thru data
+					key,
+					value: this.data[key]
+				})),
+
+				concatMap(({ key, value }) => of(({ // Test every field
+					name: {
+						valid: this.isNameValid(String(value)),
+						onInvalid: () => Error(`Emote name must be between ${Emote.MIN_EMOTE_LENGTH}-${Emote.MAX_EMOTE_LENGTH} characters and ${Emote.EmoteNameRegExp.toString()}`)
+					}
+				} as { [key in keyof DataStructure.Emote]: Emote.Validate.TestResult })[key])),
+				filter(x => typeof x !== 'undefined'),
+				map(test => ({
+					valid: test?.valid ?? false,
+					error: test?.valid ? undefined : test?.onInvalid()
+				} as Emote.Validate.Emission))
+			).subscribe({
+				error(err) { observer.error(err); },
+				next(emission) { observer.next(emission); },
+				complete() { observer.complete(); }
+			});
+		});
 	}
 
 	/**
@@ -161,7 +244,7 @@ export class Emote {
 				tap(() => Logger.Get().info(`<Emote> Deleted database entry (${this})`))
 			).subscribe({
 				complete() { observer.complete(); },
-				error(err) { console.log(err); observer.error(err); },
+				error(err) { observer.error(err); },
 				next() { observer.next(undefined); }
 			});
 		});
@@ -174,7 +257,8 @@ export class Emote {
 			private: this.data.private,
 			mime: this.data.mime,
 			owner: this.data.owner,
-			owner_name: this.data.owner_name
+			owner_name: this.data.owner_name,
+			status: this.data.status ?? 0
 		};
 	}
 
@@ -184,9 +268,33 @@ export class Emote {
 }
 
 export namespace Emote {
+	export interface UpdateOptions {
+		name: string;
+		owner: string | ObjectId;
+		global: boolean;
+	}
+
 	export interface Resized {
 		scope: number;
 		extension: string;
 		path: string;
 	}
+
+	export namespace Validate {
+		export interface Emission {
+			key: string;
+			valid: boolean;
+			error: Error | undefined;
+		}
+
+		export interface TestResult {
+			valid: boolean;
+			onInvalid: () => Error | undefined;
+		}
+	}
+
+	/** A regular expression matching a valid emote name  */
+	export const EmoteNameRegExp = new RegExp(/^[A-Za-z_éèà\(\)\:0-9]*$/);
+	export const MAX_EMOTE_LENGTH = 100;
+	export const MIN_EMOTE_LENGTH = 2;
 }
