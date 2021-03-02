@@ -3,10 +3,10 @@ import { defer, iif, Observable, of, throwError } from 'rxjs';
 import { Config } from 'src/Config';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { HttpMiddlewareEffect, HttpRequest } from '@marblejs/core';
-import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { TwitchUser } from 'src/Util/TwitchUser';
 import { Mongo } from 'src/Db/Mongo';
+import jwt from 'jsonwebtoken';
 
 type WithUserGetter = { getUser: Observable<TwitchUser> };
 export type WithUser = {
