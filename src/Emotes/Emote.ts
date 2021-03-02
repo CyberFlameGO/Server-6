@@ -258,7 +258,8 @@ export class Emote {
 			mime: this.data.mime,
 			owner: this.data.owner,
 			owner_name: this.data.owner_name,
-			status: this.data.status ?? 0
+			status: this.data.status ?? 0,
+			global: this.data.global ?? false
 		};
 	}
 
