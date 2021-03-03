@@ -130,6 +130,9 @@ export class Emote {
 						case 'global': // Verify actor is a moderator or higher
 							test = isMod;
 							break;
+						case 'tags':
+							test = isOwner || isMod;
+							break;
 					}
 
 					return of(({ key, test }));
@@ -259,7 +262,8 @@ export class Emote {
 			owner: this.data.owner,
 			owner_name: this.data.owner_name,
 			status: this.data.status ?? 0,
-			global: this.data.global ?? false
+			global: this.data.global ?? false,
+			tags: this.data.tags?? []
 		};
 	}
 
@@ -273,6 +277,7 @@ export namespace Emote {
 		name: string;
 		owner: string | ObjectId;
 		global: boolean;
+		tags: string[];
 	}
 
 	export interface Resized {
