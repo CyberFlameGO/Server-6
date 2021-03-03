@@ -58,16 +58,24 @@ namespace GetEmotes {
 		r.matchType('GET'),
 		r.use(AuthorizeMiddleware(true)),
 		r.useEffect(req$ => req$.pipe(
-			map(req => req as HttpRequest<{}, {}, Query> & WithUser),
-			switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
-			switchMap(x => from(x.col.countDocuments(getQuery(x.req.user?.id))).pipe(map(totalEstimatedSize => ({ totalEstimatedSize, ...x })))),
-			switchMap(async ({ req, col, totalEstimatedSize }) => { // Begin pagination
+			map(req => req as HttpRequest<{}, {}, (Query & GetQueryOptions)> & WithUser),
+			map(req => ({
+				query: getQuery(req.user?.id, {
+					name: req.query.name ?? undefined,
+					hideGlobal: req.query.hideGlobal === 'true',
+					submitter: req.query.submitter ?? undefined
+				}),
+				req
+			})),
+			switchMap(({ req, query }) => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req, query })))),
+			switchMap(x => from(x.col.countDocuments(x.query)).pipe(map(totalEstimatedSize => ({ totalEstimatedSize, ...x })))),
+			switchMap(async ({ req, col, totalEstimatedSize, query }) => { // Begin pagination
 				const page = parseInt(req.query.page ?? 1); // The requested page (1 if unset)
 				const pageSize = parseInt(req.query.pageSize ?? 16); // The requested size of the page (amount of documents to show)
 				const skip = (page - 1) * pageSize; // How many documents should be skipped in order to reach the requested range
 
 				return col.aggregate([ // Create aggregation pipeline
-					{ $match: getQuery(req.user?.id) },
+					{ $match: query },
 					{ $skip: skip },
 					{ $limit: pageSize }
 				]).toArray().then(emotes => ({ emotes, totalEstimatedSize }));
@@ -81,10 +89,23 @@ namespace GetEmotes {
 		))
 	);
 
-	const getQuery = (userID: ObjectId | string | undefined) => ({ // Match non-private emotes (unless user is owner)
-		$or: [{ private: false }, { owner: userID }]
-	} as FilterQuery<DataStructure.Emote>);
+	const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOptions) => {
+		const o = {} as FilterQuery<Partial<DataStructure.Emote>>;
+		options.hideGlobal === true ? o.global = { $not: { $eq: true } } as any : noop();
+		options.name?.length > 0 ? o.name = { $regex: new RegExp(options.name, 'i') } : noop();
+		options.submitter?.length > 0 ? o.owner_name = { $regex: new RegExp(options.submitter, 'i') } : noop();
 
+		return { // Match non-private emotes (unless user is owner)
+			$or: [{ private: false }, { owner: userID }],
+			...o
+		} as FilterQuery<DataStructure.Emote>;
+	};
+
+	interface GetQueryOptions {
+		name: string;
+		submitter: string;
+		hideGlobal: string | boolean;
+	}
 	interface Query {
 		page: string;
 		pageSize: string;
