@@ -2,24 +2,41 @@ import { combineRoutes, HttpRequest, r } from '@marblejs/core';
 import { concatMap, count, map, mapTo, switchMap, take, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
-import { defer, EMPTY, fromEvent, iif, of } from 'rxjs';
+import { defer, EMPTY, from, fromEvent, iif, of } from 'rxjs';
 import { Constants } from '@typings/src/Constants';
 import { ObjectId } from 'mongodb';
 import { DataStructure } from '@typings/typings/DataStructure';
 import { Emote } from 'src/Emotes/Emote';
+import { TwitchUser } from 'src/Util/TwitchUser';
 
-const GetCurrentUserRoute = r.pipe(
-	r.matchPath('/@me'),
+/**
+ * GET /users/:user
+ *
+ * Get a user or the current user
+ */
+const GetUserRoute = r.pipe(
+	r.matchPath('/:user'),
 	r.matchType('GET'),
-	r.use(AuthorizeMiddleware()),
+	r.use(AuthorizeMiddleware(true)),
 	r.useEffect(req$ => req$.pipe(
-		map(req => req as HttpRequest<unknown, { user: string}>),
+		map(req => req as HttpRequest<unknown, { user: string}> & WithUser),
 
-		switchMap(req => Mongo.Get().collection('users').pipe(map(col => ({ req, col })))),
-		switchMap(({ col, req }) => col.findOne({
-			_id: req.user?.id
-		})),
-		map(user => ({ body: { ...user } }))
+		// @me :user param means the request is for the current authenticated user
+		switchMap(req => iif(() => req.params.user === '@me', // Should get the current user?
+			of(!!req.user?.id).pipe( // Try to get current user
+				switchMap(auth => (auth && !!req.user?.getUser) ? req.user?.getUser : req.response.send({ status: 401, body: { error: 'Cannot request current user while unauthenticated' } }))
+			),
+			of(req).pipe( // Get specified user by ID
+				// Object ID is valid?
+				switchMap(req => ObjectId.isValid(req.params.user) ? Mongo.Get().collection('users') : req.response.send({ status: 400, body: { error: 'Invalid Object ID' } })),
+				switchMap(col => col.findOne({ // Find the user in DB
+					_id: new ObjectId(req.params.user)
+				})),
+				switchMap(data => !!data ? of(data) : req.response.send({ status: 404, body: { error: 'Unknown User' } })),
+				map(data => new TwitchUser(data)) // Serialize to TwitchUser
+			)
+		).pipe(map(user => ({ user: user.data, req })))),
+		map(({ user }) => ({ body: { ...user, id: undefined } })) // Hide the Twitch ID, as Twitch does not make this information public outside of OAuth2
 	))
 );
 
@@ -55,6 +72,6 @@ const BulkDeleteUserEmotes = r.pipe(
 );
 
 export const UsersRoute = combineRoutes('/users', [
-	GetCurrentUserRoute,
+	GetUserRoute,
 	BulkDeleteUserEmotes
 ]);

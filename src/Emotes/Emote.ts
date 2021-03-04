@@ -1,15 +1,15 @@
 import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'mongodb';
-import { existsSync, mkdirp } from 'fs-extra';
-import { EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError } from 'rxjs';
-import { concatAll, concatMap, defaultIfEmpty, filter, map, mapTo, mergeMap, switchMap, takeLast, tap, toArray } from 'rxjs/operators';
+import { existsSync, mkdirp, createReadStream } from 'fs-extra';
+import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError } from 'rxjs';
+import { concatAll, concatMap, filter, map, mapTo, mergeMap, skip, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
 import { Logger } from 'src/Util/Logger';
 import { TwitchUser } from 'src/Util/TwitchUser';
-import sharp from 'sharp';
 import { Constants } from '@typings/src/Constants';
+import sharp from 'sharp';
 
 export class Emote {
 	id: ObjectId;
@@ -23,6 +23,49 @@ export class Emote {
 
 	get filepath(): string {
 		return `tmp/${this.id.toHexString()}`;
+	}
+
+	/**
+	 * Process this emote
+	 */
+	process(): Observable<Emote.ProcessingUpdate> {
+		return new Observable<Emote.ProcessingUpdate>(observer => {
+			let taskIndex = 1;
+			const taskCount = 9;
+
+			scheduled([
+				this.resize().pipe(
+					tap(resized => observer.next({
+						tasks: [taskIndex++, taskCount],
+						message: `Rendering sizes.... (${resized.scope}x)`,
+						emote: this
+					})),
+					toArray(),
+					map(sizes => sizes.reverse()),
+					switchMap(sizes => from(sizes)),
+					mergeMap(size => this.upload(size).pipe(
+						tap(() => observer.next({
+							tasks: [taskIndex++, taskCount],
+							message: `Publishing... (${size.scope}/4)`,
+							emote: this
+						}))
+					))
+				),
+				defer(() => observer.next({
+					tasks: [taskIndex++, taskCount],
+					message: 'Processing complete!',
+					done: true,
+					emote: this
+				}))
+			], asyncScheduler).pipe(
+				concatAll(),
+				switchMapTo(EMPTY)
+			).subscribe({
+				complete() { observer.complete(); },
+				error(err) { observer.error(err); }
+			});
+		});
+
 	}
 
 	/**
@@ -72,6 +115,18 @@ export class Emote {
 				complete() { observer.complete(); },
 				error(err) { observer.error(err); }
 			});
+		});
+	}
+
+	upload(size: Emote.Resized): Observable<number> {
+		return new Observable<number>(observer => {
+			EmoteStore.Get().s3.putObject({
+				Bucket: Config.s3_bucket_name,
+				Key: `${EmoteStore.getEmoteObjectKey(String(this.id))}/${size.scope}x`,
+				Body: createReadStream(size.path),
+				ContentType: this.data.mime,
+				ACL: 'public-read'
+			}).then(() => observer.next(size.scope)).catch(err => observer.error(err)).finally(() => observer.complete());
 		});
 	}
 
@@ -170,7 +225,7 @@ export class Emote {
 
 	private isNameValid(value: string): boolean {
 		return Emote.EmoteNameRegExp.test(value as string)
-		&& (value as string).length < Emote.MAX_EMOTE_LENGTH && (value as string).length >= Emote.MIN_EMOTE_LENGTH;
+			&& (value as string).length < Emote.MAX_EMOTE_LENGTH && (value as string).length >= Emote.MIN_EMOTE_LENGTH;
 	}
 
 	/**
@@ -223,6 +278,10 @@ export class Emote {
 		});
 	}
 
+	addToChannel(channelName: string): Observable<Emote> {
+		return of(this);
+	}
+
 	/***
 	 * Delete this emote
 	 */
@@ -238,7 +297,7 @@ export class Emote {
 					Bucket: Config.s3_bucket_name,
 					Delete: { Objects: [...objects.map(o => ({ Key: o.Key }))] }
 				})),
-				tap(x => Logger.Get().info(`<Emote> Deleted ${x.Deleted?.length} objects (${this})`)),
+				tap(x => Logger.Get().info(`<Emote> Deleted ${x.Deleted?.length ?? 0} objects (${this})`)),
 
 				// OK: object deleted, proceed to removing the database entry
 				// TODO: Revoke emote from any channels that has it
@@ -263,7 +322,7 @@ export class Emote {
 			owner_name: this.data.owner_name,
 			status: this.data.status ?? 0,
 			global: this.data.global ?? false,
-			tags: this.data.tags?? []
+			tags: this.data.tags ?? []
 		};
 	}
 
@@ -273,6 +332,12 @@ export class Emote {
 }
 
 export namespace Emote {
+	export interface ProcessingUpdate {
+		emote: Emote;
+		tasks: number[];
+		message: string;
+		done?: boolean;
+	}
 	export interface UpdateOptions {
 		name: string;
 		owner: string | ObjectId;

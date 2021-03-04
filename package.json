@@ -22,6 +22,7 @@
     "@marblejs/middleware-jwt": "^3.4.9",
     "@marblejs/middleware-logger": "^3.4.9",
     "@marblejs/middleware-multipart": "^3.4.9",
+    "@marblejs/websockets": "^3.4.9",
     "aws-sdk": "^2.848.0",
     "chalk": "^4.1.0",
     "date-fns": "^2.17.0",

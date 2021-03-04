@@ -1,18 +1,25 @@
 import { S3 } from '@aws-sdk/client-s3';
 import { Config } from 'src/Config';
 import { createWriteStream, createReadStream } from 'fs';
-import { fromEvent, iif, Observable, of, throwError} from 'rxjs';
-import { filter, map, mapTo, mergeMap, switchMap, take, takeLast, tap, toArray } from 'rxjs/operators';
+import { asyncScheduler, EMPTY, fromEvent, iif, Observable, of, scheduled, Subject, throwError } from 'rxjs';
+import { concatAll, filter, map, mapTo, mergeMap, switchMap, take, takeLast, tap, toArray } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
 import { Logger } from 'src/Util/Logger';
 import { Mongo } from 'src/Db/Mongo';
 import { DataStructure } from '@typings/typings/DataStructure';
+import { Constants } from '@typings/src/Constants';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
 	static Get(): EmoteStore {
 		return this.instance ?? (EmoteStore.instance = new EmoteStore());
+	}
+
+	constructor() {
+		this.processingUpdate.pipe(
+			tap(x => console.log('UPDATE:', x.tasks, x.message))
+		).subscribe();
 	}
 
 	s3 = new S3({
@@ -24,6 +31,9 @@ export class EmoteStore {
 		},
 		tls: true
 	});
+
+	processing = new Map<string, Observable<Emote.ProcessingUpdate>>();
+	processingUpdate = new Subject<Emote.ProcessingUpdate>();
 
 	findEmote(id: string): Observable<Emote> {
 		return Mongo.Get().collection('emotes').pipe(
@@ -42,46 +52,40 @@ export class EmoteStore {
 				mime: options.mime,
 				owner: options.owner,
 				name: options.name,
-				private: true // Set as private by default
+				private: true, // Set as private by default
+				status: Constants.Emotes.Status.PROCESSING
 			});
 
 			// Save to disk for applying changes
-			emote.validate().pipe(
-				filter(e => !e.valid),
-				map(e => e.error),
-				toArray(),
-				switchMap(errors => iif(() => errors.length > 0,
-					throwError(`There are problems with this emote: ${errors.map(e => e?.message).join(', ')}`),
-					of(undefined)
-				)),
+			scheduled([
+				emote.validate().pipe(
+					filter(e => !e.valid),
+					map(e => e.error),
+					toArray(),
+					switchMap(errors => iif(() => errors.length > 0,
+						throwError(`There are problems with this emote: ${errors.map(e => e?.message).join(', ')}`),
+						of(undefined)
+					)),
 
-				switchMap(() => emote.ensureFilepath()),
-				switchMap(() => of(createWriteStream(`${emote.filepath}/og`)).pipe(
-					tap(stream => data.pipe(stream)),
-					switchMap(stream => fromEvent(stream, 'finish').pipe(take(1)))
-				)), // Write uploaded emote to file
-				tap(() => Logger.Get().info(`Uploading emote '${emote.data.name}'`)),
+					switchMap(() => emote.ensureFilepath()),
+					switchMap(() => of(createWriteStream(`${emote.filepath}/og`)).pipe(
+						tap(stream => data.pipe(stream)),
+						switchMap(stream => fromEvent(stream, 'finish').pipe(take(1)))
+					)), // Write uploaded emote to file
 
-				// Write to database
-				switchMap(() => emote.write()),
-				tap(() => Logger.Get().info(`<EmoteStore> Wrote '${emote.data.name}' to DB`)),
+					// Write to database
+					switchMap(() => emote.write()),
+					tap(() => Logger.Get().info(`<EmoteStore> Created new emote '${emote.data.name}'`)),
 
-				// Create all the emote sizes
-				switchMap(() => emote.resize()),
-
-				// Upload sizes to DigitalOcean
-				mergeMap(resized => this.s3.putObject({
-					Bucket: Config.s3_bucket_name,
-					Key: `${EmoteStore.getEmoteObjectKey(String(emote.id))}/${resized.scope}x`,
-					Body: createReadStream(resized.path),
-					ContentType: options.mime,
-					ACL: 'public-read'
-				})),
-				toArray(),
-				tap(() => Logger.Get().info(`<EmoteStore> Uploaded '${emote.data.name}' to CDN!`)),
-				mapTo(emote)
+					mapTo(emote)
+				)
+			], asyncScheduler).pipe(
+				concatAll(),
 			).subscribe({
-				next(emote: any) { observer.next(emote); },
+				next: (emote) => {
+					this.processing.set(emote.id.toHexString(), emote.process());
+					observer.next(emote);
+				},
 				complete() { observer.complete(); },
 				error(err) { observer.error(err); }
 			}); // pog
