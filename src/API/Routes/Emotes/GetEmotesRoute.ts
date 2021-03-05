@@ -44,6 +44,7 @@ export const GetEmotesRoute = r.pipe(
 			query: getQuery(req.user?.id, {
 				name: req.query.name ?? undefined,
 				hideGlobal: req.query.hideGlobal === 'true',
+				globalEmotes: req.query.globalEmotes ?? 'include',
 				submitter: req.query.submitter ?? undefined
 			}),
 			req
@@ -73,6 +74,13 @@ export const GetEmotesRoute = r.pipe(
 const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOptions) => {
 	const o = {} as FilterQuery<Partial<DataStructure.Emote>>;
 	options.hideGlobal === true ? o.global = { $not: { $eq: true } } as any : noop();
+	if (options.globalEmotes) {
+		({ // Handle globalEmotes query
+			include: () => noop(),
+			only: () => o.global = true,
+			hide: () => o.global = { $not: { $eq: true } }
+		} as { [key in GetQueryOptions['globalEmotes']]: () => void })[options.globalEmotes]();
+	}
 	options.name?.length > 0 ? o.name = { $regex: new RegExp(options.name, 'i') } : noop();
 	options.submitter?.length > 0 ? o.owner_name = { $regex: new RegExp(options.submitter, 'i') } : noop();
 
@@ -85,6 +93,8 @@ const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOption
 interface GetQueryOptions {
 	name: string;
 	submitter: string;
+	globalEmotes: 'only' | 'hide' | 'include';
+	/** @deprecated Use globalEmotes instead  */
 	hideGlobal: string | boolean;
 }
 interface Query {
