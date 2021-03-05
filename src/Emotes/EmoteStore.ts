@@ -38,7 +38,7 @@ export class EmoteStore {
 	findEmote(id: string): Observable<Emote> {
 		return Mongo.Get().collection('emotes').pipe(
 			switchMap(col => col.findOne({ _id: ObjectId.createFromHexString(id) })),
-			filter(x => x !== null),
+			switchMap(data => !!data ? of(data) : throwError(Error('Unknown Emote'))),
 			map(data => new Emote(data as DataStructure.Emote))
 		);
 	}

@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 
 type WithUserGetter = { getUser: Observable<TwitchUser> };
 export type WithUser = {
-	user?: API.TokenPayload & WithUserGetter;
+	user: API.TokenPayload & WithUserGetter;
 };
 
 /**

@@ -10,6 +10,7 @@ import { Config } from 'src/Config';
 import { EmotesRoute } from 'src/API/Routes/Emotes';
 import { WS_CreateEmoteStatus } from 'src/API/Routes/Emotes/CreateEmoteRoute';
 import { merge } from 'rxjs';
+import { ChannelsRoute } from 'src/API/Routes/ChannelsRoute';
 
 export class HttpListener {
 	setMiddlewares(): HttpMiddlewareEffect[] {
@@ -32,7 +33,8 @@ export class HttpListener {
 				RootRoute,
 				EmotesRoute,
 				AuthRoute,
-				UsersRoute
+				UsersRoute,
+				ChannelsRoute
 			]
 		});
 

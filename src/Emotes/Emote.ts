@@ -278,8 +278,26 @@ export class Emote {
 		});
 	}
 
-	addToChannel(channelName: string): Observable<Emote> {
-		return of(this);
+	/**
+	 * Add this emote to a TwitchUser's channel
+	 */
+	addToChannel(user: TwitchUser): Observable<TwitchUser> {
+		return user.writeUser({
+			$addToSet: {
+				emotes: this.id
+			},
+		});
+	}
+
+	/**
+	 * Remove thiss emote from a TwitchUser's channel
+	 */
+	removeFromChannel(user: TwitchUser): Observable<TwitchUser> {
+		return user.writeUser({
+			$pull: {
+				emotes: this.id
+			}
+		});
 	}
 
 	/***
