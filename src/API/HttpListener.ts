@@ -2,7 +2,7 @@ import { bindEagerlyTo, createContextToken, createServer, httpListener, HttpMidd
 import { logger$ } from '@marblejs/middleware-logger';
 import { bodyParser$ } from '@marblejs/middleware-body';
 import { webSocketListener, mapToServer, WebSocketServerConnection, createWebSocketServer } from '@marblejs/websockets';
-import { RootRoute } from 'src/API/Routes/RootRoute';
+import { ExtensionRoute, RootRoute } from 'src/API/Routes/RootRoute';
 import { AuthRoute } from 'src/API/Routes/AuthRoute';
 import { cors$ } from '@marblejs/middleware-cors';
 import { UsersRoute } from 'src/API/Routes/UsersRoute';
@@ -19,6 +19,7 @@ export class HttpListener {
 			bodyParser$({}),
 			cors$({ // Define CORS rules
 				origin: '*',
+				withCredentials: false,
 				allowHeaders: '*',
 				methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 			})
@@ -31,6 +32,7 @@ export class HttpListener {
 			middlewares: this.setMiddlewares(),
 			effects: [
 				RootRoute,
+				ExtensionRoute,
 				EmotesRoute,
 				AuthRoute,
 				UsersRoute,
