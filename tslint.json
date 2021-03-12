@@ -6,6 +6,24 @@
 			"options": "tabs"
 		},
 		"no-trailing-whitespace": true,
-		"semicolon": true
+		"semicolon": true,
+		"typedef-whitespace": {
+			"options": [
+			  {
+				"call-signature": "nospace",
+				"index-signature": "nospace",
+				"parameter": "nospace",
+				"property-declaration": "nospace",
+				"variable-declaration": "nospace"
+			  },
+			  {
+				"call-signature": "onespace",
+				"index-signature": "onespace",
+				"parameter": "onespace",
+				"property-declaration": "onespace",
+				"variable-declaration": "onespace"
+			  }
+			]
+		  }
 	}
 }
