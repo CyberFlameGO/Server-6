@@ -1,16 +1,11 @@
-import { bindEagerlyTo, createContextToken, createServer, httpListener, HttpMiddlewareEffect, HttpServerEffect, matchEvent, ServerEvent } from '@marblejs/core';
+import { bindEagerlyTo, combineRoutes, createContextToken, createServer, httpListener, HttpMiddlewareEffect, HttpServerEffect, matchEvent, ServerEvent } from '@marblejs/core';
 import { logger$ } from '@marblejs/middleware-logger';
 import { bodyParser$ } from '@marblejs/middleware-body';
 import { webSocketListener, mapToServer, WebSocketServerConnection, createWebSocketServer } from '@marblejs/websockets';
-import { ExtensionRoute, RootRoute } from 'src/API/Routes/RootRoute';
-import { AuthRoute } from 'src/API/Routes/AuthRoute';
 import { cors$ } from '@marblejs/middleware-cors';
-import { UsersRoute } from 'src/API/Routes/UsersRoute';
 import { Config } from 'src/Config';
-import { EmotesRoute } from 'src/API/Routes/Emotes';
-import { WS_CreateEmoteStatus } from 'src/API/Routes/Emotes/CreateEmoteRoute';
 import { merge } from 'rxjs';
-import { ChannelsRoute } from 'src/API/Routes/ChannelsRoute';
+import { HttpEffects, WSEffects } from 'src/API/EffectIndex';
 
 export class HttpListener {
 	setMiddlewares(): HttpMiddlewareEffect[] {
@@ -31,12 +26,8 @@ export class HttpListener {
 		const listener = httpListener({
 			middlewares: this.setMiddlewares(),
 			effects: [
-				RootRoute,
-				ExtensionRoute,
-				EmotesRoute,
-				AuthRoute,
-				UsersRoute,
-				ChannelsRoute
+				combineRoutes('/v1', [ ...HttpEffects ]),
+				...HttpEffects
 			]
 		});
 
@@ -44,9 +35,7 @@ export class HttpListener {
 		const WebSocketServerToken = createContextToken<WebSocketServerConnection>('VeryPog');
 		const wsServer = createWebSocketServer({ // Create new websocket server
 			listener: webSocketListener({
-				effects: [
-					WS_CreateEmoteStatus
-				]
+				effects: [ ...WSEffects ]
 			})
 		});
 
