@@ -3,13 +3,16 @@
 		"outDir": "dist/",
 		"sourceMap": true,
 		"module": "CommonJS",
+        "lib": ["esnext", "dom"],
 		"moduleResolution": "node",
-		"target": "ES6",
+		"target": "ES2019",
 		"baseUrl": ".",
 		"experimentalDecorators": true,
 		"resolveJsonModule": true,
 		"esModuleInterop": true,
 		"strict": true,
+		"allowJs": true,
+		"checkJs": true,
 
         "paths": {
             "src/*": ["./src/*"],
@@ -32,5 +35,8 @@
         "./node_modules",
         "./node_modules/*",
         "./node_modules/@types/node/index.d.ts"
-    ]
+    ],
+	"files": [
+		"worker_bootstrap.js"
+	]
 }

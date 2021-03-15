@@ -8,7 +8,7 @@
     "start": "ttsc && node dist/src/app.js",
     "start-container": "node dist/src/app.js",
     "build": "ttsc",
-    "watch": "ts-node-dev -r tsconfig-paths/register src/app.ts",
+    "watch": "ts-node-dev --trace-warnings -r tsconfig-paths/register src/app.ts",
     "prisma": "prisma generate"
   },
   "author": "Anatole",
@@ -28,17 +28,23 @@
     "date-fns": "^2.17.0",
     "fp-ts": "^2.9.5",
     "fs-extra": "^9.1.0",
+    "imagemin": "^7.0.1",
+    "imagemin-gifsicle": "^7.0.0",
+    "imagemin-pngquant": "^9.0.2",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.6.4",
     "rxjs": "^6.6.3",
     "sharp": "^0.27.1",
-    "superagent": "^6.1.0"
+    "superagent": "^6.1.0",
+    "ts-node": "^9.1.1"
   },
   "config": {
     "libvips": "8.10"
   },
   "devDependencies": {
     "@types/fs-extra": "^9.0.7",
+    "@types/imagemin": "^7.0.0",
+    "@types/imagemin-gifsicle": "^7.0.0",
     "@types/mongodb": "^3.6.8",
     "@types/node": "^14.14.30",
     "@types/sharp": "^0.27.1",
