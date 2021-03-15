@@ -11,6 +11,7 @@ import { Constants } from 'src/Util/Constants';
 import { Worker } from 'worker_threads';
 import { UseTaggedWorkerMessage } from 'src/Util/WorkerUtil';
 import path from 'path';
+import { Logger } from 'src/Util/Logger';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
@@ -78,6 +79,7 @@ export class EmoteStore {
 						emoteID: emote.id.toHexString()
 					})),
 					switchMap(msg => worker.terminate().then(() => msg.data)),
+					tap(err => Logger.Get().error(`Error while uploading ${emote},`, err)),
 					switchMap(err => throwError(err))
 				),
 
