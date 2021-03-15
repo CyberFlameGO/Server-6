@@ -46,6 +46,10 @@ export const AddChannelEmoteRoute = r.pipe(
 		)),
 
 		// Update the user
+		switchMap(({ emote, req, user}) => iif(() => emote.data.status === Constants.Emotes.Status.PROCESSING,
+			defer(() => req.response.send({ status: 423, body: { error: 'Emote is Processing.' } })), // Decline the request if the emote is still processing
+			of({ emote, req, user })
+		)),
 		switchMap(({ user, emote, req }) => !emote.data.global ? emote.addToChannel(user) : req.response.send({ status: 403, body: { error: 'Emote is Global' } })),
 
 		map(user => ({
