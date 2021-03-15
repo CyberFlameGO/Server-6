@@ -167,7 +167,7 @@ export class Emote {
 	upload(size: Emote.Resized): Observable<number> {
 		return new Observable<number>(observer => {
 			EmoteStore.Get().s3.putObject({
-				Bucket: Config.s3_bucket_name,
+				Bucket: Config.s3_bucket_name ?? '7tv',
 				Key: `${EmoteStore.getEmoteObjectKey(String(this.id))}/${size.scope}x`,
 				Body: createReadStream(size.path),
 				ContentType: this.data.mime,
@@ -358,7 +358,7 @@ export class Emote {
 			})).pipe(
 				map(out => out.Contents ?? []), // Map to contents
 				switchMap(objects => EmoteStore.Get().s3.deleteObjects({ // Delete the objects retrieved
-					Bucket: Config.s3_bucket_name,
+					Bucket: Config.s3_bucket_name ?? '7tv',
 					Delete: { Objects: [...objects.map(o => ({ Key: o.Key }))] }
 				})),
 				tap(x => Logger.Get().info(`<Emote> Deleted ${x.Deleted?.length ?? 0} objects (${this})`)),
