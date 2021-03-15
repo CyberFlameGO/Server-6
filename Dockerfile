@@ -6,6 +6,7 @@ ADD tslint.json .
 ADD package.json .
 ADD package-lock.json .
 ADD src ./src
+ADD worker_bootstrap.js .
 ADD .env .
 
 # Clone typings repo
