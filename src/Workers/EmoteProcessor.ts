@@ -1,6 +1,6 @@
 import { Emote } from 'src/Emotes/Emote';
 import { workerData, parentPort } from 'worker_threads';
-import { asapScheduler, of, scheduled } from 'rxjs';
+import { asapScheduler, defer, of, scheduled, timer } from 'rxjs';
 import { concatAll, map, switchMap, take, takeLast, takeUntil, tap } from 'rxjs/operators';
 import { UseTaggedWorkerMessage } from 'src/Util/WorkerUtil';
 import { createWriteStream } from 'fs';
@@ -33,6 +33,7 @@ scheduled([
 		takeLast(1),
 		tap(() => Logger.Get().info(`<EmoteProcessor> [${emote}] Finished writing original upload as local file`))
 	),
+	timer(1000),
 
 	// Write the emote to DB
 	of(undefined).pipe(
@@ -43,7 +44,10 @@ scheduled([
 	// Begin processing the emote
 	emote.process().pipe(
 		tap(update => parentPort?.postMessage({ tag: 'ProcessingUpdate', data: update }))
-	)
+	),
+
+	// Processing complete: Ask main thread to set this emote as live
+	defer(() => parentPort?.postMessage({ tag: 'ProcessingComplete', data: null }))
 ], asapScheduler).pipe(concatAll()).subscribe({
 	error(err) { parentPort?.postMessage({ tag: 'Error', data: err }); }
 });

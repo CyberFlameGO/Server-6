@@ -88,6 +88,11 @@ export class EmoteStore {
 				// Handle processing updates
 				UseTaggedWorkerMessage<Emote.ProcessingUpdate>('ProcessingUpdate', worker).pipe(
 					tap(msg => this.processingUpdate.next(msg.data))
+				),
+
+				UseTaggedWorkerMessage<void>('ProcessingComplete', worker).pipe(
+					tap(() => emote.data.status = AppConstants.Emotes.Status.LIVE),
+					switchMap(() => emote.write())
 				)
 			], asyncScheduler).pipe(mergeAll(), mapTo(EMPTY)).subscribe({
 				error(err) { observer.error(err); }
