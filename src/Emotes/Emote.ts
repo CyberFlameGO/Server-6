@@ -138,8 +138,8 @@ export class Emote {
 	/**
 	 * Optimize this emote
 	 */
-	optimize(size: Emote.Resized): Observable<imagemin.Result[]> {
-		return new Observable<imagemin.Result[]>(observer => {
+	optimize(size: Emote.Resized): Observable<imagemin.Result> {
+		return new Observable<imagemin.Result>(observer => {
 			const isAnimated = size.extension === 'gif';
 			from(imagemin([size.path], {
 				plugins: [ isAnimated
@@ -152,9 +152,9 @@ export class Emote {
 						strip: true,
 						quality: [0.4, 0.75]
 					})
-				], destination: `${size.path.replace(size.extension, `optimized.${size.extension}`)}`
+				], destination: `${this.filepath}/min`
 			})).subscribe({
-				next(result) { observer.next(result); },
+				next(result) { observer.next(result[0]); },
 				complete() { observer.complete(); },
 				error(err) { observer.error(err); }
 			});
