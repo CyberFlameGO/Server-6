@@ -3,8 +3,8 @@ import { multipart$ } from '@marblejs/middleware-multipart';
 import { WsEffect } from '@marblejs/websockets';
 import { ObjectId } from 'bson';
 import { basename, extname } from 'path';
-import { of, noop, throwError, iif } from 'rxjs';
-import { switchMap, catchError, tap, map, delay, take, filter, mapTo, takeLast, mergeMap, takeWhile } from 'rxjs/operators';
+import { of, noop, throwError, iif, defer } from 'rxjs';
+import { switchMap, catchError, tap, map, take, mergeMap, filter, delay } from 'rxjs/operators';
 import { AuthorizeMiddleware } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Emote } from 'src/Emotes/Emote';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -61,21 +61,23 @@ export const CreateEmoteRoute = r.pipe(
  * Listen to Emote Creation Status
  */
 export const WS_CreateEmoteStatus: WsEffect = (event$, ctx) =>
-		event$.pipe(
-			matchEvent('CreateEmote:Status'),
-			tap(x => console.log(x.payload)),
-			map(ev => (ev.payload as any)?.emoteId),
-			switchMap(emoteId => ObjectId.isValid(emoteId) ? of(ObjectId.createFromHexString(emoteId)) : throwError(Error('Invalid Object ID'))),
-			map(id => EmoteStore.Get().processing.get(id.toHexString())),
-			switchMap(updates => !!updates ? updates : throwError(Error('Emote is not processing'))),
-			mergeMap(update => of({
-				...update,
-				emote: update.emote.id.toHexString()
-			})),
-			map(payload => ({
-				type: 'CreateEmote:Status',
-				done: payload.done,
-				payload
-			})),
-			tap(p => p.done ? ctx.client.terminate() : noop())
-		);
+	event$.pipe(
+		matchEvent('CreateEmote:Status'),
+		map(ev => (ev.payload as any)?.emoteId),
+		switchMap(emoteId => ObjectId.isValid(emoteId) ? of(ObjectId.createFromHexString(emoteId)) : throwError(Error('Invalid Object ID'))),
+		map(id => EmoteStore.Get().processingUpdate.pipe(
+			filter(update => update.emoteID === id.toHexString())
+		)),
+		switchMap(updates => !!updates ? updates : throwError(Error('Emote is not processing'))),
+		mergeMap(update => iif(() => update.error === true,
+			defer(() => ctx.client.close(1011, update.message)),
+			of(update)
+		)),
+		map(payload => ({
+			type: 'CreateEmote:Status',
+			done: payload.done,
+			payload
+		})),
+		delay(500),
+		tap(p => p.done ? ctx.client.close(1000, 'Processing complete') : noop())
+	);

@@ -1,14 +1,16 @@
 import { S3 } from '@aws-sdk/client-s3';
 import { Config } from 'src/Config';
-import { createWriteStream, createReadStream } from 'fs';
-import { asyncScheduler, EMPTY, fromEvent, iif, Observable, of, scheduled, Subject, throwError } from 'rxjs';
-import { concatAll, filter, map, mapTo, mergeMap, switchMap, take, takeLast, tap, toArray } from 'rxjs/operators';
+import { asyncScheduler, EMPTY, Observable, of, scheduled, Subject, throwError } from 'rxjs';
+import { map, mapTo, mergeAll, switchMap, take, tap } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
-import { Logger } from 'src/Util/Logger';
 import { Mongo } from 'src/Db/Mongo';
 import { DataStructure } from '@typings/typings/DataStructure';
-import { Constants } from '@typings/src/Constants';
+import { Constants as AppConstants } from '@typings/src/Constants';
+import { Constants } from 'src/Util/Constants';
+import { Worker } from 'worker_threads';
+import { UseTaggedWorkerMessage } from 'src/Util/WorkerUtil';
+import path from 'path';
 
 export class EmoteStore {
 	private static instance: EmoteStore;
@@ -16,11 +18,7 @@ export class EmoteStore {
 		return this.instance ?? (EmoteStore.instance = new EmoteStore());
 	}
 
-	constructor() {
-		this.processingUpdate.pipe(
-			tap(x => console.log('UPDATE:', x.tasks, x.message))
-		).subscribe();
-	}
+	constructor() {}
 
 	s3 = new S3({
 		region: 'ams3',
@@ -44,51 +42,60 @@ export class EmoteStore {
 	}
 
 	/**
-	 * Create a new Emote
+	 * Create a new Emote.
+	 *
+	 * This will create a Worker Thread within which the emote
+	 * will be created and processed.
 	 */
-	create(data: NodeJS.ReadableStream, options: EmoteStore.CreateOptions): Observable<Emote> {
+	create(file: NodeJS.ReadableStream, options: EmoteStore.CreateOptions): Observable<Emote> {
 		return new Observable<Emote>(observer => {
 			const emote = new Emote({ // Synthesize emote instance
+				_id: new ObjectId(),
 				mime: options.mime,
 				owner: options.owner,
 				name: options.name,
 				private: true, // Set as private by default
-				status: Constants.Emotes.Status.PROCESSING
+				status: AppConstants.Emotes.Status.PROCESSING
+			});
+			observer.next(emote);
+
+			// Create processing worker
+			const worker = new Worker(Constants.WORKER_BOOTSTRAP_PATH, {
+				workerData: {
+					workerFile: `src/Workers/EmoteProcessor${path.extname(__filename)}`,
+					emoteData: JSON.stringify(emote.resolve())
+				}
 			});
 
-			// Save to disk for applying changes
 			scheduled([
-				emote.validate().pipe(
-					filter(e => !e.valid),
-					map(e => e.error),
-					toArray(),
-					switchMap(errors => iif(() => errors.length > 0,
-						throwError(`There are problems with this emote: ${errors.map(e => e?.message).join(', ')}`),
-						of(undefined)
-					)),
+				// Handle errors
+				UseTaggedWorkerMessage<Error>('Error', worker).pipe(
+					take(1),
+					tap(msg => this.processingUpdate.next({
+						done: false, error: true,
+						message: msg.data.message,
+						tasks: [0, 0],
+						emoteID: emote.id.toHexString()
+					})),
+					switchMap(msg => worker.terminate().then(() => msg.data)),
+					switchMap(err => throwError(err))
+				),
 
-					switchMap(() => emote.ensureFilepath()),
-					switchMap(() => of(createWriteStream(`${emote.filepath}/og`)).pipe(
-						tap(stream => data.pipe(stream)),
-						switchMap(stream => fromEvent(stream, 'finish').pipe(take(1)))
-					)), // Write uploaded emote to file
+				UseTaggedWorkerMessage<void>('WriteDB', worker).pipe(
+					switchMap(() => emote.write())
+				),
 
-					// Write to database
-					switchMap(() => emote.write()),
-					tap(() => Logger.Get().info(`<EmoteStore> Created new emote '${emote.data.name}'`)),
-
-					mapTo(emote)
+				// Handle processing updates
+				UseTaggedWorkerMessage<Emote.ProcessingUpdate>('ProcessingUpdate', worker).pipe(
+					tap(msg => this.processingUpdate.next(msg.data))
 				)
-			], asyncScheduler).pipe(
-				concatAll(),
-			).subscribe({
-				next: (emote) => {
-					this.processing.set(emote.id.toHexString(), emote.process());
-					observer.next(emote);
-				},
-				complete() { observer.complete(); },
+			], asyncScheduler).pipe(mergeAll(), mapTo(EMPTY)).subscribe({
 				error(err) { observer.error(err); }
-			}); // pog
+			});
+
+			// Send the file to worker
+			file.on('end', () => worker.postMessage({ tag: 'FileStreamEnd', data: null }));
+			file.on('data', (chunk: Buffer) => worker.postMessage({ tag: 'FileStreamChunk', data: chunk }));
 		});
 	}
 

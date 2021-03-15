@@ -1,15 +1,19 @@
 import { DataStructure } from '@typings/typings/DataStructure';
-import { ObjectId } from 'mongodb';
 import { existsSync, mkdirp, createReadStream } from 'fs-extra';
 import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError } from 'rxjs';
-import { concatAll, concatMap, filter, map, mapTo, mergeMap, skip, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';
-import { Mongo } from 'src/Db/Mongo';
+import { concatAll, concatMap, filter, map, mapTo, mergeMap, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
 import { Logger } from 'src/Util/Logger';
 import { TwitchUser } from 'src/Util/TwitchUser';
-import { Constants } from '@typings/src/Constants';
+import { Constants as AppConstants } from '@typings/src/Constants';
+import { ObjectId } from 'mongodb';
+import { Mongo } from 'src/Db/Mongo';
 import sharp from 'sharp';
+import imagemin from 'imagemin';
+import imageminPng from 'imagemin-pngquant';
+import imageminGif from 'imagemin-gifsicle';
+import { Constants } from 'src/Util/Constants';
 
 export class Emote {
 	id: ObjectId;
@@ -18,11 +22,11 @@ export class Emote {
 	 * A utility for creating a new emote
 	 */
 	constructor(public data: Partial<DataStructure.Emote>) {
-		this.id = ObjectId.isValid(this.data?._id ?? '') ? this.data._id as ObjectId : new ObjectId();
+		this.id = ObjectId.isValid(this.data?._id ?? '') ? new ObjectId(this.data._id) : new ObjectId();
 	}
 
 	get filepath(): string {
-		return `tmp/${this.id.toHexString()}`;
+		return `${Constants.APP_ROOT}/tmp/${this.id.toHexString()}`;
 	}
 
 	/**
@@ -31,23 +35,36 @@ export class Emote {
 	process(): Observable<Emote.ProcessingUpdate> {
 		return new Observable<Emote.ProcessingUpdate>(observer => {
 			let taskIndex = 1;
-			const taskCount = 9;
+			const taskCount = 13;
 
+			const emoteID = this.id.toHexString();
 			scheduled([
 				this.resize().pipe(
 					tap(resized => observer.next({
 						tasks: [taskIndex++, taskCount],
 						message: `Rendering sizes.... (${resized.scope}x)`,
-						emote: this
+						emoteID
 					})),
 					toArray(),
 					map(sizes => sizes.reverse()),
 					switchMap(sizes => from(sizes)),
+
+					mergeMap(size => this.optimize(size).pipe(
+						tap(() => observer.next({
+							tasks: [taskIndex++, taskCount],
+							message: `Optimizing emote... (${size.scope}/4)`,
+							emoteID
+						})),
+						mapTo(size)
+					)),
+					toArray(),
+					switchMap(sizes => from(sizes)),
+
 					mergeMap(size => this.upload(size).pipe(
 						tap(() => observer.next({
 							tasks: [taskIndex++, taskCount],
 							message: `Publishing... (${size.scope}/4)`,
-							emote: this
+							emoteID
 						}))
 					))
 				),
@@ -55,7 +72,7 @@ export class Emote {
 					tasks: [taskIndex++, taskCount],
 					message: 'Processing complete!',
 					done: true,
-					emote: this
+					emoteID
 				}))
 			], asyncScheduler).pipe(
 				concatAll(),
@@ -111,13 +128,42 @@ export class Emote {
 					path: `${this.filepath}/${scope}x.${fileExtension}`
 				} as Emote.Resized))
 			).subscribe({
-				next(resized) { console.log(resized); observer.next(resized); },
+				next(resized) { observer.next(resized); },
 				complete() { observer.complete(); },
 				error(err) { observer.error(err); }
 			});
 		});
 	}
 
+	/**
+	 * Optimize this emote
+	 */
+	optimize(size: Emote.Resized): Observable<imagemin.Result[]> {
+		return new Observable<imagemin.Result[]>(observer => {
+			const isAnimated = size.extension === 'gif';
+			from(imagemin([size.path], {
+				plugins: [ isAnimated
+					? imageminGif({
+						optimizationLevel: 3,
+						interlaced: true,
+						colors: 200
+					})
+					: imageminPng({
+						strip: true,
+						quality: [0.4, 0.75]
+					})
+				], destination: `${size.path.replace(size.extension, `optimized.${size.extension}`)}`
+			})).subscribe({
+				next(result) { observer.next(result); },
+				complete() { observer.complete(); },
+				error(err) { observer.error(err); }
+			});
+		});
+	}
+
+	/**
+	 * Upload this emote to the CDN
+	 */
 	upload(size: Emote.Resized): Observable<number> {
 		return new Observable<number>(observer => {
 			EmoteStore.Get().s3.putObject({
@@ -173,7 +219,7 @@ export class Emote {
 			from(Object.keys(options ?? {}) as (keyof Emote.UpdateOptions)[]).pipe(
 				mergeMap(key => {
 					const isOwner = ((!!this.data.owner && !!actor) && actor.id?.equals(this.data.owner)) ?? false;
-					const isMod = (actor?.data.rank ?? 0) >= Constants.Users.Rank.MODERATOR;
+					const isMod = (actor?.data.rank ?? 0) >= AppConstants.Users.Rank.MODERATOR;
 					let test = false;
 					switch (key) {
 						case 'name': // Check name is correct
@@ -336,7 +382,7 @@ export class Emote {
 			name: this.data.name ?? '',
 			private: this.data.private,
 			mime: this.data.mime,
-			owner: this.data.owner,
+			owner: !!this.data.owner && ObjectId.isValid(this.data.owner) ? new ObjectId(this.data.owner) : undefined,
 			owner_name: this.data.owner_name,
 			status: this.data.status ?? 0,
 			global: this.data.global ?? false,
@@ -351,9 +397,10 @@ export class Emote {
 
 export namespace Emote {
 	export interface ProcessingUpdate {
-		emote: Emote;
+		emoteID: string;
 		tasks: number[];
 		message: string;
+		error?: boolean;
 		done?: boolean;
 	}
 	export interface UpdateOptions {
