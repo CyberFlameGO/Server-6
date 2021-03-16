@@ -6,6 +6,7 @@ import { switchMap, tap, mapTo, map } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Logger } from 'src/Util/Logger';
+import { AuditLogMiddleware } from 'src/API/Middlewares/AuditLogMiddleware';
 
 
 /**
@@ -17,6 +18,7 @@ export const DeleteEmoteRoute = r.pipe(
 	r.matchPath('/:emote'),
 	r.matchType('DELETE'),
 	r.use(AuthorizeMiddleware(false)),
+	r.use(AuditLogMiddleware('EMOTE_DELETE')),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest & WithUser),
 

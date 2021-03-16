@@ -5,6 +5,7 @@ import { ObjectId } from 'bson';
 import { basename, extname } from 'path';
 import { of, noop, throwError, iif, defer } from 'rxjs';
 import { switchMap, catchError, tap, map, take, mergeMap, filter, delay } from 'rxjs/operators';
+import { AuditLogMiddleware } from 'src/API/Middlewares/AuditLogMiddleware';
 import { AuthorizeMiddleware } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Emote } from 'src/Emotes/Emote';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -18,23 +19,33 @@ export const CreateEmoteRoute = r.pipe(
 	r.matchPath('/'),
 	r.matchType('POST'),
 	r.use(AuthorizeMiddleware()),
+	r.use(AuditLogMiddleware('EMOTE_CREATE')),
 	r.useEffect(req$ => req$.pipe(
 		switchMap(req => of(req).pipe(
 			use(multipart$({ // Get multipart file
-				maxFileCount: 2,
-				maxFileSize: 25e5,
+				maxFileCount: 2, // Only 2 files, the JSON metadata and the image BLOB
+				maxFileSize: 25e5, // Set maximum file size (2.5MB)
 				stream: ({ file, mimetype, filename, fieldname }) => {
 					if (mimetype === 'application/json' && (fieldname === 'data' && filename === 'FORM_CONTENT')) {
-						file.on('data', (chunk: Buffer) => console.log(chunk.toString('utf8')));
+						file.on('data', (chunk: Buffer) => { // Parse json data
+							req.meta = {
+								...req.meta,
+								...JSON.parse(chunk.toString('utf8'))
+							}						
+						});
 
 						return of({ destination: { body: '' } });
 					}
+
+					// Begin creating the emote
 					return EmoteStore.Get().create(file, {
 						mime: mimetype,
 						name: basename(filename, extname(filename)),
 						owner: req.user.id
 					}).pipe(
 						take(1),
+						// The created emote will be emitted after being written to DB.
+						// The request completes here, the user will then connect to the websocket for feedback on processing status
 						catchError(err => req.response.send({
 							status: 400,
 							body: { error: String(err) }

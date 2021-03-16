@@ -1,8 +1,10 @@
 import { HttpRequest, r } from '@marblejs/core';
 import { Constants } from '@typings/src/Constants';
+import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'mongodb';
 import { defer, iif, of, throwError } from 'rxjs';
-import { switchMap, tap, catchError, map } from 'rxjs/operators';
+import { switchMap, tap, catchError, map, mapTo } from 'rxjs/operators';
+import { AuditLogMiddleware, InsertAuditChange } from 'src/API/Middlewares/AuditLogMiddleware';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Emote } from 'src/Emotes/Emote';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -19,6 +21,7 @@ export const EditEmoteRoute = r.pipe(
 	r.matchPath('/:emote'),
 	r.matchType('PATCH'),
 	r.use(AuthorizeMiddleware(false)),
+	r.use(AuditLogMiddleware('EMOTE_EDIT')),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<{}, { emote: string; }> & WithUser),
 
@@ -35,9 +38,24 @@ export const EditEmoteRoute = r.pipe(
 			defer(() => req.response.send({ status: 423, body: { error: 'Emote is Processing.' } })), // Decline the request if the emote is still processing
 			of({ emote, req, user })
 		)),
-		switchMap(({ emote, req, user }) => emote.update(req.body as Emote.UpdateOptions, user).pipe(
+
+		map(x => ({ ...x, oldEmoteData: Object.create(x.emote.data) as DataStructure.Emote })),
+		switchMap(({ emote, oldEmoteData, req, user }) => emote.update(req.body as Emote.UpdateOptions, user).pipe(
 			// Log edit
 			tap(emote => Logger.Get().info(`<Emote> Edit ${emote} by ${user} (${Object.keys(req.body).map(k => `${k}: ${(req.body as any)[k]}`)})`)),
+
+			// Add audit log meta
+			mapTo(req),
+			InsertAuditChange([
+				...Object.keys(req.body)
+					.map(key => ({
+						key,
+						new_value: (req.body as any)[key],
+						old_value: (oldEmoteData as any)[key]
+					}) as DataStructure.AuditLog.Entry.Change)
+			]),
+
+			mapTo(emote),
 			catchError(err => req.response.send({ status: 400, body: { error: err.message } }))
 		)),
 

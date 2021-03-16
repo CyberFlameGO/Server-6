@@ -42,7 +42,7 @@ export class Emote {
 				this.resize().pipe(
 					tap(resized => observer.next({
 						tasks: [taskIndex++, taskCount],
-						message: `Rendering sizes.... (${resized.scope}x)`,
+						message: `Rendering sizes.... (${resized.scope}/4)`,
 						emoteID
 					})),
 					toArray(),
