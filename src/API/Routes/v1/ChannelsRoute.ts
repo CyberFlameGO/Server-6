@@ -121,11 +121,12 @@ const GetChannelEmotesRoute = r.pipe(
 
 		// Get & emit the user's emotes
 		switchMap(({ user, emotes }) => emotes.find({
-			_id: { $in: user?.emotes as ObjectId[] },
+			_id: { $in: user?.emotes as ObjectId[] ?? [] },
 			$or: [{ global: false }, { global: undefined }] // Omit global emotes, as they're available regardless of being a channel emote
 		}).toArray()),
 
 		map(emotes => ({
+			status: emotes.length > 0 ? 200 : 204,
 			body: { count: emotes.length, emotes }
 		}))
 	))

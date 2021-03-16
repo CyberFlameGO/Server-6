@@ -3,7 +3,7 @@ import { ChannelsRoute } from 'src/API/Routes/v1/ChannelsRoute';
 import { EmotesRoute } from 'src/API/Routes/v1/Emotes';
 import { WS_CreateEmoteStatus } from 'src/API/Routes/v1/Emotes/CreateEmoteRoute';
 import { RootRoute, ExtensionRoute } from 'src/API/Routes/v1/RootRoute';
-import { UsersRoute } from 'src/API/Routes/v1/UsersRoute';
+import { UsersRoute } from 'src/API/Routes/v1/Users';
 
 export const HttpEffects = [
 	RootRoute,
