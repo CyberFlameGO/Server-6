@@ -13,6 +13,7 @@ const emote = new Emote(JSON.parse(emoteData));
 
 scheduled([
 	// Validate emote.
+	defer(() => sendProcesssingUpdate('Validating emote...')),
 	emote.validate().pipe(
 		tap(validated => Logger.Get().info(`<EmoteProcessor> [${emote}] validated: ${validated.valid}`))
 	),
@@ -23,6 +24,7 @@ scheduled([
 	),
 
 	// Listen for incoming file chunks from the main thread
+	defer(() => sendProcesssingUpdate('Writing uploaded file to disk...')),
 	of(undefined).pipe(
 		map(() => createWriteStream(`${emote.filepath}/og`)), // Start writing the OG file to disk
 		switchMap(stream => UseTaggedWorkerMessage<Uint8Array>('FileStreamChunk', parentPort).pipe(
@@ -36,12 +38,14 @@ scheduled([
 	timer(1000),
 
 	// Write the emote to DB
+	defer(() => sendProcesssingUpdate(`Indexing ${emote.data.name}...`)),
 	of(undefined).pipe(
 		tap(() => parentPort?.postMessage({ tag: 'WriteDB', data: null })),
 		tap(() => Logger.Get().info(`<EmoteProcessor> [${emote}] Requesting mainthread to write to DB`))
 	),
 
 	// Begin processing the emote
+	defer(() => sendProcesssingUpdate('Processing...')),
 	emote.process().pipe(
 		tap(update => parentPort?.postMessage({ tag: 'ProcessingUpdate', data: update }))
 	),
@@ -50,6 +54,15 @@ scheduled([
 	defer(() => parentPort?.postMessage({ tag: 'ProcessingComplete', data: null }))
 ], asapScheduler).pipe(concatAll()).subscribe({
 	error(err) { parentPort?.postMessage({ tag: 'Error', data: err }); }
+});
+
+const sendProcesssingUpdate = (message: string): void => parentPort?.postMessage({
+	tag: 'ProcessingUpdate',
+	data: {
+		emoteID: String(emote.id),
+		message,
+		tasks: [0, 1]
+	} as Emote.ProcessingUpdate
 });
 
 export interface WorkerData {
