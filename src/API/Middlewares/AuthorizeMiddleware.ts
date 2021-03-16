@@ -1,7 +1,7 @@
 import { API } from '@typings/typings/API';
 import { defer, iif, Observable, of, throwError } from 'rxjs';
 import { Config } from 'src/Config';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map, mapTo, switchMap, tap } from 'rxjs/operators';
 import { HttpMiddlewareEffect, HttpRequest } from '@marblejs/core';
 import { ObjectId } from 'mongodb';
 import { TwitchUser } from 'src/Util/TwitchUser';
@@ -40,8 +40,17 @@ export const AuthorizeMiddleware = (optional = false): HttpMiddlewareEffect<Http
 						)
 					} as API.TokenPayload & WithUserGetter;
 
-					return req;
-				})
+					return req as HttpRequest & WithUser;
+				}),
+				
+				// Check if banned
+				switchMap(req => Mongo.Get().collection('bans').pipe(
+					switchMap(col => col.find({ user: new ObjectId(req.user.id) }).toArray()),
+					switchMap(bans => iif(() => bans.length > 0,
+						defer(() => req.response.send({ status: 403, body: { error: `You are currently banned for ${bans.map(ban => ban?.reason).join(',')}` } })),
+						of(req)
+					))
+				))
 			),
 			optional ? of(req) : defer(() => req.response.send({ status: 401, body: { error: 'Authorization Required' } })),
 		)),

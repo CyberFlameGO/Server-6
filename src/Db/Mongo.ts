@@ -27,6 +27,8 @@ export class Mongo extends MongoClient {
 	 */
 	collection<T>(name: string): Observable<Collection<T>>;
 	collection<T extends DataStructure.TwitchUser>(name: 'users'): Observable<Collection<T>>;
+	collection<T extends DataStructure.AuditLog.Entry>(name: 'audit'): Observable<Collection<T>>;
+	collection<T extends DataStructure.Ban>(name: 'bans'): Observable<Collection<T>>;
 	collection<T extends DataStructure.Emote>(name: 'emotes'): Observable<Collection<T>>;
 	collection<T extends DataStructure.BearerToken>(name: 'oauth'): Observable<Collection<T>>;
 	collection<T>(name: string): Observable<Collection<T>> {

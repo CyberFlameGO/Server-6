@@ -121,6 +121,37 @@ export class TwitchUser {
 		});
 	}
 
+	/**
+	 * Ban this user, restricting their access on all routes with required authorization
+	 * 
+	 * @param reason the reason for the suspension
+	 */
+	ban(reason = 'no reason'): Observable<TwitchUser> {
+		if (!this.id || !ObjectId.isValid(this.id)) return throwError(Error('User is uninitialized'));
+
+		return Mongo.Get().collection('bans').pipe(
+			switchMap(col => col.insertOne({
+				user: this.id as ObjectId,
+				reason
+			})),
+			mapTo(this)
+		);
+	}
+
+	/**
+	 * Unban this user
+	 */
+	pardon(): Observable<TwitchUser> {
+		if (!this.id || !ObjectId.isValid(this.id)) return throwError(Error('User is uninitialized'));
+
+		return Mongo.Get().collection('bans').pipe(
+			switchMap(col => col.deleteMany({
+				user: this.id as ObjectId
+			})),
+			mapTo(this)
+		)
+	}
+
 	toString(): string {
 		return `${this.data.display_name} (${this.data.login}, ${this.data.id})`;
 	}
