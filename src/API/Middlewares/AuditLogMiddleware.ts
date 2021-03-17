@@ -1,7 +1,7 @@
 import { HttpRequest } from '@marblejs/core';
 import { DataStructure } from '@typings/typings/DataStructure';
 import { asapScheduler, EMPTY, fromEvent, Observable, of, scheduled } from 'rxjs';
-import { map, mergeAll, switchMap, switchMapTo, tap } from 'rxjs/operators';
+import { filter, map, mergeAll, switchMap, switchMapTo, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { Logger } from 'src/Util/Logger';
 import { TwitchUser } from 'src/Util/TwitchUser';
@@ -17,6 +17,7 @@ export const AuditLogMiddleware = (entryType: keyof typeof DataStructure.AuditLo
 
 		// Listen for the request'
 		fromEvent(req.response, 'finish').pipe(
+			filter(() => req.response.statusCode >= 200 && req.response.statusCode < 300), // Only do this for successful (2xx) requests
 			switchMap(() => Mongo.Get().collection('audit')), // Get audit collection
 			switchMap(col => col.insertOne({ // Insert as new document
 				type: DataStructure.AuditLog.Entry.Type[entryType],
