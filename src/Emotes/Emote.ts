@@ -239,6 +239,9 @@ export class Emote {
 						case 'tags':
 							test = isOwner || isMod;
 							break;
+						case 'private':
+							test = isOwner || isMod;
+							break;
 					}
 
 					return of(({ key, test }));
@@ -412,6 +415,7 @@ export namespace Emote {
 		name: string;
 		owner: string | ObjectId;
 		global: boolean;
+		private: boolean;
 		tags: string[];
 	}
 

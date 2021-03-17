@@ -2,11 +2,13 @@ import { HttpRequest, r } from '@marblejs/core';
 import { ObjectId, FilterQuery } from 'mongodb';
 import { Constants } from '@typings/src/Constants';
 import { DataStructure } from '@typings/typings/DataStructure';
-import { from, noop, of, throwError } from 'rxjs';
+import { defer, from, iif, noop, of } from 'rxjs';
 import { switchMap, map } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
+import { TwitchUser } from 'src/Util/TwitchUser';
 
+const unknownEmoteError = (req: HttpRequest) => req.response.send({ status: 404, body: { error: 'Unknown Emote' } });
 /**
  * GET /emotes/:emote
  *
@@ -15,18 +17,28 @@ import { Mongo } from 'src/Db/Mongo';
 export const GetEmoteRoute = r.pipe(
 	r.matchPath('/:emote'),
 	r.matchType('GET'),
+	r.use(AuthorizeMiddleware(true)),
 	r.useEffect(req$ => req$.pipe(
+		map(req => req as HttpRequest<{}, GetEmoteParams>),
+		switchMap(req => iif(() => ObjectId.isValid(req.params.emote), // Reject the request if invalid object ID
+			of(req),
+			defer(() => unknownEmoteError(req))
+		)),
 		switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
-		switchMap(({ req, col }) => col.findOne({
+		switchMap(({ req, col }) => from(col.findOne({
 			_id: ObjectId.createFromHexString((req.params as any).emote),
 			status: { $not: { $eq: Constants.Emotes.Status.DELETED } }
-		})),
-		switchMap(emote => !!emote ? of(emote) : throwError('Unknown Emote')),
+		})).pipe(map(emote => ({ emote, req })))),
+		switchMap(({ req, emote }) => !!emote ? of({ emote, req }) : unknownEmoteError(req)),
+		switchMap(({ emote, req }) => emote.private ? (new ObjectId(emote.owner).equals(req.user?.id) ? of(emote) : unknownEmoteError(req)) : of(emote)),
 		map(emote => ({
 			body: emote
 		}))
 	))
 );
+interface GetEmoteParams {
+	emote: string;
+}
 
 /**
  * GET /emotes
@@ -40,11 +52,19 @@ export const GetEmotesRoute = r.pipe(
 	r.use(AuthorizeMiddleware(true)),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<{}, {}, (Query & GetQueryOptions)> & WithUser),
-		map(req => ({
+
+		// Handle channel param
+		switchMap(req => iif(() => typeof req.query.channel === 'string' && (req.query.channel === '@me' || ObjectId.isValid(req.query.channel)),
+			TwitchUser.find((req.query.channel  === '@me') ? String(req.user.id) : req.query.channel as string),
+			of(undefined)
+		).pipe(map(targetChannel => ({ req, targetChannel })))),
+
+		map(({ targetChannel, req }) => ({
 			query: getQuery(req.user?.id, {
 				name: req.query.name ?? undefined,
 				hideGlobal: req.query.hideGlobal === 'true',
 				globalEmotes: req.query.globalEmotes ?? 'include',
+				channel: targetChannel as TwitchUser,
 				submitter: req.query.submitter ?? undefined
 			}),
 			req
@@ -79,10 +99,11 @@ const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOption
 			include: () => noop(),
 			only: () => o.global = true,
 			hide: () => o.global = { $not: { $eq: true } }
-		} as { [key in GetQueryOptions['globalEmotes']]: () => void })[options.globalEmotes]();
+		} as { [key in GetQueryOptions['globalEmotes']]: () => void })[options.globalEmotes ?? (() => noop())]();
 	}
 	options.name?.length > 0 ? o.name = { $regex: new RegExp(options.name, 'i') } : noop();
 	options.submitter?.length > 0 ? o.owner_name = { $regex: new RegExp(options.submitter, 'i') } : noop();
+	options.channel instanceof TwitchUser ? o._id = { $in: [...options.channel.data.emotes?.map(id => new ObjectId(id)) ?? []] } : noop();
 
 	return { // Match non-private emotes (unless user is owner)
 		$or: [{ private: false }, { owner: userID }],
@@ -94,6 +115,7 @@ interface GetQueryOptions {
 	name: string;
 	submitter: string;
 	globalEmotes: 'only' | 'hide' | 'include';
+	channel: string | TwitchUser;
 	/** @deprecated Use globalEmotes instead  */
 	hideGlobal: string | boolean;
 }
