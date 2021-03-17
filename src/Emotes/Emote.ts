@@ -221,6 +221,7 @@ export class Emote {
 			const update = {} as any; // Final result (after being verified)
 
 			// Verify
+			let ownerChanged = false;
 			from(Object.keys(options ?? {}) as (keyof Emote.UpdateOptions)[]).pipe(
 				mergeMap(key => {
 					const isOwner = ((!!this.data.owner && !!actor) && actor.id?.equals(this.data.owner)) ?? false;
@@ -240,7 +241,7 @@ export class Emote {
 							test = isOwner || isMod;
 							break;
 						case 'private':
-							test = isOwner || isMod;
+							test = ownerChanged = isOwner || isMod;
 							break;
 					}
 
@@ -256,6 +257,7 @@ export class Emote {
 					_id: this.id
 				}, { $set: update }, { returnOriginal: false }) : throwError(Error('Nothing changed'))),
 				tap(data => data.ok && !!data.value ? this.data = data.value : noop()),
+				switchMap(() => this.updateOwnerName()),
 				map(() => this as Emote)
 			).subscribe({
 				next(emote) { observer.next(emote); },
@@ -263,6 +265,20 @@ export class Emote {
 				error(err) { observer.error(err); }
 			});
 		});
+	}
+
+	/**
+	 * Update the owner_name property, syncing it with the set owner ID
+	 */
+	updateOwnerName(): Observable<void> {
+		return Mongo.Get().collection('emotes').pipe(
+			switchMap(col => TwitchUser.find(String(this.data.owner)).pipe(map(user => ({ user, col })))),
+			switchMap(({ col, user }) => col.updateOne({ _id: this.id }, {
+				$set: { owner_name: user.data.display_name }
+			}).then(() => this.data.owner_name = user.data.display_name)),
+
+			mapTo(undefined)
+		);
 	}
 
 	/**
