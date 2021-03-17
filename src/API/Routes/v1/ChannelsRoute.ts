@@ -55,7 +55,10 @@ export const AddChannelEmoteRoute = r.pipe(
 		map(x => ({ ...x, oldEmoteList: [ ...x.user.data.emotes ] })),
 		switchMap(({ user, emote, oldEmoteList, req }) => !emote.data.global ? emote.addToChannel(user).pipe(
 			mapTo(req),
-			InsertAuditChange(() => ([ { key: 'emotes', old_value: oldEmoteList, new_value: user.data.emotes } ])),
+			InsertAuditChange(() => {
+				const index = user.data.emotes.findIndex(id => id instanceof ObjectId ? id.equals(emote.id) : String(id) === String(emote.id));
+				return [ { key: `emotes[${index}]`, old_value: oldEmoteList[index], new_value: user.data.emotes[index] } ];
+			}),
 			InsertAuditTarget(() => !!user.id ? ({ type: 'users', id: user.id }) : undefined),
 			mapTo(user)
 		) : req.response.send({ status: 403, body: { error: 'Emote is Global' } })),
@@ -104,7 +107,10 @@ const DeleteChannelEmoteRoute = r.pipe(
 		map(x => ({ ...x, oldEmoteList: x.user.data.emotes })),
 		switchMap(({ user, emote, oldEmoteList, req }) => emote.removeFromChannel(user).pipe(
 			mapTo(req),
-			InsertAuditChange(() => ([ { key: 'emotes', old_value: oldEmoteList, new_value: user.data.emotes } ])),
+			InsertAuditChange(() => {
+				const index = oldEmoteList.findIndex(id => id instanceof ObjectId ? id.equals(emote.id) : String(id) === String(emote.id));
+				return [ { key: `emotes[${index}]`, old_value: oldEmoteList[index], new_value: user.data.emotes[index] } ];
+			}),
 			InsertAuditTarget(() => !!user.id ? ({ type: 'users', id: user.id }) : undefined),
 			mapTo(user)
 		)),
