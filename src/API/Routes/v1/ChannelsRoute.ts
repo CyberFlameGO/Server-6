@@ -4,11 +4,12 @@ import { Constants } from '@typings/src/Constants';
 import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'bson';
 import { asyncScheduler, BehaviorSubject, defer, iif, of, scheduled } from 'rxjs';
-import { catchError, map, mergeAll, reduce, switchMap, switchMapTo } from 'rxjs/operators';
+import { catchError, map, mapTo, mergeAll, reduce, switchMap, switchMapTo } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { TwitchUser } from 'src/Util/TwitchUser';
+import { AuditLogMiddleware, InsertAuditChange, InsertAuditTarget } from 'src/API/Middlewares/AuditLogMiddleware';
 
 /**
 * PUT /channels/:channel/emotes/:emote
@@ -19,6 +20,7 @@ export const AddChannelEmoteRoute = r.pipe(
 	r.matchPath('/:channel/emotes/:emote'),
 	r.matchType('PUT'),
 	r.use(AuthorizeMiddleware(false)),
+	r.use(AuditLogMiddleware('USER_CHANNEL_EMOTE_ADD')),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<{}, SetChannelEmoteParams, {}> & WithUser),
 
@@ -50,7 +52,13 @@ export const AddChannelEmoteRoute = r.pipe(
 			defer(() => req.response.send({ status: 423, body: { error: 'Emote is Processing.' } })), // Decline the request if the emote is still processing
 			of({ emote, req, user })
 		)),
-		switchMap(({ user, emote, req }) => !emote.data.global ? emote.addToChannel(user) : req.response.send({ status: 403, body: { error: 'Emote is Global' } })),
+		map(x => ({ ...x, oldEmoteList: [ ...x.user.data.emotes ] })),
+		switchMap(({ user, emote, oldEmoteList, req }) => !emote.data.global ? emote.addToChannel(user).pipe(
+			mapTo(req),
+			InsertAuditChange(() => ([ { key: 'emotes', old_value: oldEmoteList, new_value: user.data.emotes } ])),
+			InsertAuditTarget(() => !!user.id ? ({ type: 'users', id: user.id }) : undefined),
+			mapTo(user)
+		) : req.response.send({ status: 403, body: { error: 'Emote is Global' } })),
 
 		map(user => ({
 			body: user.data
@@ -65,6 +73,7 @@ const DeleteChannelEmoteRoute = r.pipe(
 	r.matchPath('/:channel/emotes/:emote'),
 	r.matchType('DELETE'),
 	r.use(AuthorizeMiddleware(false)),
+	r.use(AuditLogMiddleware('USER_CHANNEL_EMOTE_REMOVE')),
 	r.useEffect(req$ => req$.pipe(
 		map(req => req as HttpRequest<{}, SetChannelEmoteParams, {}> & WithUser),
 
@@ -92,7 +101,13 @@ const DeleteChannelEmoteRoute = r.pipe(
 		)),
 
 		// Update the user
-		switchMap(({ user, emote, req }) => emote.removeFromChannel(user)),
+		map(x => ({ ...x, oldEmoteList: x.user.data.emotes })),
+		switchMap(({ user, emote, oldEmoteList, req }) => emote.removeFromChannel(user).pipe(
+			mapTo(req),
+			InsertAuditChange(() => ([ { key: 'emotes', old_value: oldEmoteList, new_value: user.data.emotes } ])),
+			InsertAuditTarget(() => !!user.id ? ({ type: 'users', id: user.id }) : undefined),
+			mapTo(user)
+		)),
 
 		map(user => ({ body: user.data }))
 	))

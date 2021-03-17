@@ -4,7 +4,7 @@ import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'mongodb';
 import { defer, iif, of, throwError } from 'rxjs';
 import { switchMap, tap, catchError, map, mapTo } from 'rxjs/operators';
-import { AuditLogMiddleware, InsertAuditChange } from 'src/API/Middlewares/AuditLogMiddleware';
+import { AuditLogMiddleware, InsertAuditChange, InsertAuditTarget } from 'src/API/Middlewares/AuditLogMiddleware';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Emote } from 'src/Emotes/Emote';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -34,7 +34,7 @@ export const EditEmoteRoute = r.pipe(
 
 		// Update the emote
 		tap(({ emote }) => console.log('Emote State', emote.data.status)),
-		switchMap(({ emote, req, user}) => iif(() => emote.data.status === Constants.Emotes.Status.PROCESSING,
+		switchMap(({ emote, req, user }) => iif(() => emote.data.status === Constants.Emotes.Status.PROCESSING,
 			defer(() => req.response.send({ status: 423, body: { error: 'Emote is Processing.' } })), // Decline the request if the emote is still processing
 			of({ emote, req, user })
 		)),
@@ -46,14 +46,14 @@ export const EditEmoteRoute = r.pipe(
 
 			// Add audit log meta
 			mapTo(req),
-			InsertAuditChange([
-				...Object.keys(req.body)
-					.map(key => ({
-						key,
-						new_value: (req.body as any)[key],
-						old_value: (oldEmoteData as any)[key]
-					}) as DataStructure.AuditLog.Entry.Change)
-			]),
+			InsertAuditChange(req => Object.keys(req.body)
+				.map(key => ({
+					key,
+					new_value: (req.body as any)[key],
+					old_value: (oldEmoteData as any)[key]
+				}) as DataStructure.AuditLog.Entry.Change)
+			),
+			InsertAuditTarget(() => ({ id: emote.id, type: 'emotes' })), // Add emote as target in audit log entry
 
 			mapTo(emote),
 			catchError(err => req.response.send({ status: 400, body: { error: err.message } }))

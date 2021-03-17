@@ -1,11 +1,13 @@
 import { matchEvent, r, use } from '@marblejs/core';
 import { multipart$ } from '@marblejs/middleware-multipart';
 import { WsEffect } from '@marblejs/websockets';
+import { Constants } from '@typings/src/Constants';
+import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'bson';
 import { basename, extname } from 'path';
 import { of, noop, throwError, iif, defer } from 'rxjs';
 import { switchMap, catchError, tap, map, take, mergeMap, filter, delay } from 'rxjs/operators';
-import { AuditLogMiddleware } from 'src/API/Middlewares/AuditLogMiddleware';
+import { AuditLogMiddleware, InsertAuditChange, InsertAuditTarget } from 'src/API/Middlewares/AuditLogMiddleware';
 import { AuthorizeMiddleware } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Emote } from 'src/Emotes/Emote';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
@@ -28,10 +30,11 @@ export const CreateEmoteRoute = r.pipe(
 				stream: ({ file, mimetype, filename, fieldname }) => {
 					if (mimetype === 'application/json' && (fieldname === 'data' && filename === 'FORM_CONTENT')) {
 						file.on('data', (chunk: Buffer) => { // Parse json data
-							req.meta = {
-								...req.meta,
-								...JSON.parse(chunk.toString('utf8'))
-							}						
+							const data = JSON.parse(chunk.toString('utf8')) as Partial<DataStructure.Emote>;
+							if (!!req.meta?.emote) { // Add emote data
+								if (typeof data.name === 'string' && Constants.Emotes.NAME_REGEXP.test(data.name)) req.meta.emote.data.name = data.name;
+								if (Array.isArray(data.tags)) req.meta.emote.data.tags = data.tags;
+							}
 						});
 
 						return of({ destination: { body: '' } });
@@ -55,12 +58,27 @@ export const CreateEmoteRoute = r.pipe(
 					);
 				}
 			})),
-			map(req => ({
-				req,
-				emote: req.meta?.emote as Emote
-			}))
+
+			InsertAuditChange(req => { // Log this creation
+				const emote = req.meta?.emote as Emote;
+
+				return [
+					{ key: 'name', old_value: null, new_value: emote.data.name },
+					{ key: 'owner', old_value: null, new_value: emote.data.owner },
+					{ key: 'private', old_value: null, new_value: emote.data.private },
+					{ key: 'mime', old_value: null, new_value: emote.data.mime },
+					{ key: 'status', old_value: null, new_value: emote.data.status },
+					{ key: 'tags', old_value: [], new_value: emote.data.tags }
+				];
+			}),
+			InsertAuditTarget(req => { // Add the emote as audit target
+				const emote = req.meta?.emote as Emote;
+
+				return { id: emote.id, type: 'emotes' };
+			}),
+			map(req => req.meta?.emote as Emote)
 		)),
-		map(({ emote, req }) => ({
+		map(emote => ({
 			body: emote.resolve()
 		}))
 	))

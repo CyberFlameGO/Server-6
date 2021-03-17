@@ -1,14 +1,14 @@
 import { API } from '@typings/typings/API';
 import { defer, iif, Observable, of, throwError } from 'rxjs';
 import { Config } from 'src/Config';
-import { catchError, map, mapTo, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { HttpMiddlewareEffect, HttpRequest } from '@marblejs/core';
 import { ObjectId } from 'mongodb';
 import { TwitchUser } from 'src/Util/TwitchUser';
 import { Mongo } from 'src/Db/Mongo';
 import jwt from 'jsonwebtoken';
 
-type WithUserGetter = { getUser: Observable<TwitchUser> };
+type WithUserGetter = { getUser: Observable<TwitchUser>; instance?: TwitchUser; };
 export type WithUser = {
 	user: API.TokenPayload & WithUserGetter;
 };
@@ -36,13 +36,13 @@ export const AuthorizeMiddleware = (optional = false): HttpMiddlewareEffect<Http
 						getUser: Mongo.Get().collection('users').pipe( // Create user getter
 							switchMap(col => col.findOne({ _id: id  })),
 							switchMap(data => !!data ? of(data) : throwError(Error('Unknown User'))),
-							map(data => new TwitchUser(data))
+							map(data => req.user.instance = new TwitchUser(data))
 						)
 					} as API.TokenPayload & WithUserGetter;
 
 					return req as HttpRequest & WithUser;
 				}),
-				
+
 				// Check if banned
 				switchMap(req => Mongo.Get().collection('bans').pipe(
 					switchMap(col => col.find({ user: new ObjectId(req.user.id) }).toArray()),

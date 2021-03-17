@@ -1,6 +1,6 @@
 import { DataStructure } from '@typings/typings/DataStructure';
 import { existsSync, mkdirp, createReadStream } from 'fs-extra';
-import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError } from 'rxjs';
+import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError, timer } from 'rxjs';
 import { concatAll, concatMap, filter, map, mapTo, mergeMap, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
@@ -38,6 +38,7 @@ export class Emote {
 			const taskCount = 13;
 
 			const emoteID = this.id.toHexString();
+			const sizes = [] as Emote.Resized[];
 			scheduled([
 				this.resize().pipe(
 					tap(resized => observer.next({
@@ -46,10 +47,11 @@ export class Emote {
 						emoteID
 					})),
 					toArray(),
-					map(sizes => sizes.reverse()),
-					switchMap(sizes => from(sizes)),
+					map(arr => sizes.push(...arr.reverse())),
+				),
 
-					mergeMap(size => this.optimize(size).pipe(
+				from(sizes).pipe(
+					concatMap(size => this.optimize(size).pipe(
 						tap(() => observer.next({
 							tasks: [taskIndex++, taskCount],
 							message: `Optimizing emote... (${size.scope}/4)`,
@@ -57,10 +59,11 @@ export class Emote {
 						})),
 						mapTo(size)
 					)),
-					toArray(),
-					switchMap(sizes => from(sizes)),
+					toArray()
+				),
 
-					mergeMap(size => this.upload(size).pipe(
+				from(sizes).pipe(
+					concatMap(size => this.upload(size).pipe(
 						tap(() => observer.next({
 							tasks: [taskIndex++, taskCount],
 							message: `Publishing... (${size.scope}/4)`,
@@ -68,12 +71,14 @@ export class Emote {
 						}))
 					))
 				),
+
 				defer(() => observer.next({
 					tasks: [taskIndex++, taskCount],
 					message: 'Processing complete!',
-					done: true,
 					emoteID
-				}))
+				})),
+				timer(1000),
+				defer(() => observer.next({ done: true, tasks: [taskIndex, taskCount], message: '', emoteID }))
 			], asyncScheduler).pipe(
 				concatAll(),
 				switchMapTo(EMPTY)
@@ -142,7 +147,7 @@ export class Emote {
 		return new Observable<imagemin.Result>(observer => {
 			const isAnimated = size.extension === 'gif';
 			from(imagemin([size.path], {
-				plugins: [ isAnimated
+				plugins: [isAnimated
 					? imageminGif({
 						optimizationLevel: 3,
 						interlaced: true,
@@ -270,8 +275,8 @@ export class Emote {
 	}
 
 	private isNameValid(value: string): boolean {
-		return Emote.EmoteNameRegExp.test(value as string)
-			&& (value as string).length < Emote.MAX_EMOTE_LENGTH && (value as string).length >= Emote.MIN_EMOTE_LENGTH;
+		return AppConstants.Emotes.NAME_REGEXP.test(value as string)
+			&& (value as string).length < AppConstants.Emotes.MAX_EMOTE_LENGTH && (value as string).length >= AppConstants.Emotes.MIN_EMOTE_LENGTH;
 	}
 
 	/**
@@ -288,7 +293,7 @@ export class Emote {
 				concatMap(({ key, value }) => of(({ // Test every field
 					name: {
 						valid: this.isNameValid(String(value)),
-						onInvalid: () => Error(`Emote name must be between ${Emote.MIN_EMOTE_LENGTH}-${Emote.MAX_EMOTE_LENGTH} characters and ${Emote.EmoteNameRegExp.toString()}`)
+						onInvalid: () => Error(AppConstants.Emotes.NAME_PATTERN_ERROR)
 					}
 				} as { [key in keyof DataStructure.Emote]: Emote.Validate.TestResult })[key])),
 				filter(x => typeof x !== 'undefined'),
@@ -428,9 +433,4 @@ export namespace Emote {
 			onInvalid: () => Error | undefined;
 		}
 	}
-
-	/** A regular expression matching a valid emote name  */
-	export const EmoteNameRegExp = new RegExp(/^[A-Za-z_éèà\(\)\:0-9]*$/);
-	export const MAX_EMOTE_LENGTH = 100;
-	export const MIN_EMOTE_LENGTH = 2;
 }

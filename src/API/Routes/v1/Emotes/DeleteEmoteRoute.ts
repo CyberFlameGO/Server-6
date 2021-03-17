@@ -6,7 +6,8 @@ import { switchMap, tap, mapTo, map } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Logger } from 'src/Util/Logger';
-import { AuditLogMiddleware } from 'src/API/Middlewares/AuditLogMiddleware';
+import { AuditLogMiddleware, InsertAuditTarget } from 'src/API/Middlewares/AuditLogMiddleware';
+import { Emote } from 'src/Emotes/Emote';
 
 
 /**
@@ -31,7 +32,8 @@ export const DeleteEmoteRoute = r.pipe(
 		switchMap(({ req, emote, user }) => iif(() => (ObjectId.isValid(String(emote.data.owner)) && new ObjectId(emote.data.owner).equals(user.id ?? '') || (user.data.rank ?? 0) >= Constants.Users.Rank.MODERATOR),
 			emote.delete().pipe(
 				tap(emote => Logger.Get().info(`<Emote> Delete ${emote} by ${user}`)),
-				mapTo(req)
+				mapTo(req),
+				InsertAuditTarget(() => ({ id: emote.id, type: 'emotes' })), // Add emote as target in audit log entry
 			),
 			defer(() => req.response.send({ status: 403, body: { error: 'You are not permitted to do this' } }))
 		)),
