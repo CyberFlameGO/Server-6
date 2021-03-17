@@ -123,7 +123,7 @@ export class TwitchUser {
 
 	/**
 	 * Ban this user, restricting their access on all routes with required authorization
-	 * 
+	 *
 	 * @param reason the reason for the suspension
 	 */
 	ban(reason = 'no reason'): Observable<TwitchUser> {
@@ -149,7 +149,7 @@ export class TwitchUser {
 				user: this.id as ObjectId
 			})),
 			mapTo(this)
-		)
+		);
 	}
 
 	toString(): string {
