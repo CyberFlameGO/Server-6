@@ -52,7 +52,7 @@ export const AddChannelEmoteRoute = r.pipe(
 			defer(() => req.response.send({ status: 423, body: { error: 'Emote is Processing.' } })), // Decline the request if the emote is still processing
 			of({ emote, req, user })
 		)),
-		map(x => ({ ...x, oldEmoteList: [ ...x.user.data.emotes ] })),
+		map(x => ({ ...x, oldEmoteList: [ ...(x.user.data.emotes ?? []) ] })),
 		switchMap(({ user, emote, oldEmoteList, req }) => !emote.data.global ? emote.addToChannel(user).pipe(
 			mapTo(req),
 			InsertAuditChange(() => {
@@ -104,7 +104,7 @@ const DeleteChannelEmoteRoute = r.pipe(
 		)),
 
 		// Update the user
-		map(x => ({ ...x, oldEmoteList: x.user.data.emotes })),
+		map(x => ({ ...x, oldEmoteList: [ ...(x.user.data.emotes ?? []) ] })),
 		switchMap(({ user, emote, oldEmoteList, req }) => emote.removeFromChannel(user).pipe(
 			mapTo(req),
 			InsertAuditChange(() => {
