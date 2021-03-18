@@ -222,7 +222,7 @@ export class Emote {
 
 			// Verify
 			let ownerChanged = false;
-			from(Object.keys(options ?? {}) as (keyof Emote.UpdateOptions)[]).pipe(
+			from(Object.keys(options ?? {}).filter(k => (options[k as keyof Emote.UpdateOptions]) !== undefined) as (keyof Emote.UpdateOptions)[]).pipe(
 				mergeMap(key => {
 					const isOwner = ((!!this.data.owner && !!actor) && actor.id?.equals(this.data.owner)) ?? false;
 					const isMod = (actor?.data.rank ?? 0) >= AppConstants.Users.Rank.MODERATOR;
@@ -294,8 +294,7 @@ export class Emote {
 	}
 
 	private isNameValid(value: string): boolean {
-		return AppConstants.Emotes.NAME_REGEXP.test(value as string)
-			&& (value as string).length < AppConstants.Emotes.MAX_EMOTE_LENGTH && (value as string).length >= AppConstants.Emotes.MIN_EMOTE_LENGTH;
+		return AppConstants.Emotes.NAME_REGEXP.test(value as string);
 	}
 
 	/**

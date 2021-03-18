@@ -106,8 +106,8 @@ const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOption
 	options.channel instanceof TwitchUser ? o._id = { $in: [...options.channel.data.emotes?.map(id => new ObjectId(id)) ?? []] } : noop();
 
 	return { // Match non-private emotes (unless user is owner)
-		$or: [{ private: false }, { owner: userID }],
-		...o
+		...o,
+		$or: [{ private: false }, { owner: new ObjectId(userID) }, { owner: String(userID) }]
 	} as FilterQuery<DataStructure.Emote>;
 };
 

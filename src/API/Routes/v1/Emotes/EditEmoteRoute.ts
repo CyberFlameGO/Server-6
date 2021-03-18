@@ -23,7 +23,7 @@ export const EditEmoteRoute = r.pipe(
 	r.use(AuthorizeMiddleware(false)),
 	r.use(AuditLogMiddleware('EMOTE_EDIT')),
 	r.useEffect(req$ => req$.pipe(
-		map(req => req as HttpRequest<{}, { emote: string; }> & WithUser),
+		map(req => req as HttpRequest<Body, { emote: string; }> & WithUser),
 
 		// Verify emote ID
 		switchMap(req => ObjectId.isValid((req.params as any).emote) ? of(req) : req.response.send({ status: 400, body: { error: 'Invalid Emote ID' } })),
@@ -40,7 +40,13 @@ export const EditEmoteRoute = r.pipe(
 		)),
 
 		map(x => ({ ...x, oldEmoteData: Object.create(x.emote.data) as DataStructure.Emote })),
-		switchMap(({ emote, oldEmoteData, req, user }) => emote.update(req.body as Emote.UpdateOptions, user).pipe(
+		switchMap(({ emote, oldEmoteData, req, user }) => emote.update({
+			global: req.body.global,
+			name: req.body.name,
+			private: req.body.private,
+			tags: req.body.tags,
+			owner: ObjectId.isValid(req.body.owner) ? new ObjectId(req.body.owner) : undefined
+		} as Emote.UpdateOptions, user).pipe(
 			// Log edit
 			tap(emote => Logger.Get().info(`<Emote> Edit ${emote} by ${user} (${Object.keys(req.body).map(k => `${k}: ${(req.body as any)[k]}`)})`)),
 
@@ -64,3 +70,5 @@ export const EditEmoteRoute = r.pipe(
 		}))
 	))
 );
+
+interface Body extends Emote.UpdateOptions {}
