@@ -3,7 +3,7 @@ import { ObjectId, FilterQuery } from 'mongodb';
 import { Constants } from '@typings/src/Constants';
 import { DataStructure } from '@typings/typings/DataStructure';
 import { defer, from, iif, noop, of } from 'rxjs';
-import { switchMap, map } from 'rxjs/operators';
+import { switchMap, map, mapTo } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
 import { TwitchUser } from 'src/Util/TwitchUser';
@@ -19,18 +19,25 @@ export const GetEmoteRoute = r.pipe(
 	r.matchType('GET'),
 	r.use(AuthorizeMiddleware(true)),
 	r.useEffect(req$ => req$.pipe(
-		map(req => req as HttpRequest<{}, GetEmoteParams>),
+		map(req => req as HttpRequest<{}, GetEmoteParams> & WithUser),
 		switchMap(req => iif(() => ObjectId.isValid(req.params.emote), // Reject the request if invalid object ID
 			of(req),
 			defer(() => unknownEmoteError(req))
 		)),
+
 		switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
 		switchMap(({ req, col }) => from(col.findOne({
 			_id: ObjectId.createFromHexString((req.params as any).emote),
 			status: { $not: { $eq: Constants.Emotes.Status.DELETED } }
 		})).pipe(map(emote => ({ emote, req })))),
+
 		switchMap(({ req, emote }) => !!emote ? of({ emote, req }) : unknownEmoteError(req)),
-		switchMap(({ emote, req }) => emote.private ? (new ObjectId(emote.owner).equals(req.user?.id) ? of(emote) : unknownEmoteError(req)) : of(emote)),
+
+
+		// Get the authenticated user, if exists
+		// This is for checking if it is a privileged user who may be able to view a private emote
+		switchMap(({ req, emote }) => (emote?.private && !!req.user) ? req.user.getUser.pipe(mapTo({ req, emote })) : of({ req, emote })),
+		switchMap(({ emote, req }) => (emote.private && !req.user.instance?.isMod()) ? (new ObjectId(emote.owner).equals(req.user?.id) ? of(emote) : unknownEmoteError(req)) : of(emote)),
 		map(emote => ({
 			body: emote
 		}))
@@ -54,6 +61,7 @@ export const GetEmotesRoute = r.pipe(
 		map(req => req as HttpRequest<{}, {}, (Query & GetQueryOptions)> & WithUser),
 
 		// Handle channel param
+		switchMap(req => !!req.user ? req.user.getUser.pipe(mapTo(req)) : of(req)),
 		switchMap(req => iif(() => typeof req.query.channel === 'string' && (req.query.channel === '@me' || ObjectId.isValid(req.query.channel)),
 			TwitchUser.find((req.query.channel  === '@me') ? String(req.user.id) : req.query.channel as string),
 			of(undefined)
@@ -66,7 +74,7 @@ export const GetEmotesRoute = r.pipe(
 				globalEmotes: req.query.globalEmotes ?? 'include',
 				channel: targetChannel as TwitchUser,
 				submitter: req.query.submitter ?? undefined
-			}),
+			}, (req.user?.instance?.data.rank ?? 0) >= Constants.Users.Rank.MODERATOR), // Allow jannies to view private emotes
 			req
 		})),
 		switchMap(({ req, query }) => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req, query })))),
@@ -91,7 +99,7 @@ export const GetEmotesRoute = r.pipe(
 	))
 );
 
-const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOptions) => {
+const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOptions, isMod = false) => {
 	const o = {} as FilterQuery<Partial<DataStructure.Emote>>;
 	options.hideGlobal === true ? o.global = { $not: { $eq: true } } as any : noop();
 	if (options.globalEmotes) {
@@ -107,7 +115,8 @@ const getQuery = (userID: ObjectId | string | undefined, options: GetQueryOption
 
 	return { // Match non-private emotes (unless user is owner)
 		...o,
-		$or: [{ private: false }, { owner: new ObjectId(userID) }, { owner: String(userID) }]
+		$or: isMod ? [{}] : [{ private: false }, { owner: new ObjectId(userID) }],
+		status: { $not: { $eq: Constants.Emotes.Status.DELETED } }
 	} as FilterQuery<DataStructure.Emote>;
 };
 

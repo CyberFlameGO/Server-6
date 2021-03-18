@@ -1,13 +1,13 @@
-import { DataStructure, MongoDocument } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure';
 import { API } from '@typings/typings/API';
 import { Config } from 'src/Config';
 import { Constants } from 'src/Util/Constants';
+import { Constants as AppConstants } from '@typings/src/Constants';
 import { Mongo } from 'src/Db/Mongo';
-import { filter, map, mapTo, mergeAll, pluck, switchMap, take, tap } from 'rxjs/operators';
+import { filter, map, mapTo, pluck, switchMap, tap } from 'rxjs/operators';
 import { ObjectId, UpdateQuery } from 'mongodb';
 import { from, iif, noop, Observable, of, throwError } from 'rxjs';
 import superagent from 'superagent';
-import { Emote } from 'src/Emotes/Emote';
 
 export class TwitchUser {
 	id: ObjectId | (null | undefined) = null;
@@ -150,6 +150,10 @@ export class TwitchUser {
 			})),
 			mapTo(this)
 		);
+	}
+
+	isMod(): boolean {
+		return (this.data.rank ?? 0) >= AppConstants.Users.Rank.MODERATOR;
 	}
 
 	toString(): string {
