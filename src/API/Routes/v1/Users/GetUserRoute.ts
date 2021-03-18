@@ -1,7 +1,9 @@
-import { HttpRequest, r } from '@marblejs/core';
+import { HttpRequest, matchEvent, r } from '@marblejs/core';
+import { WsEffect } from '@marblejs/websockets';
+import { DataStructure } from '@typings/typings/DataStructure';
 import { ObjectId } from 'mongodb';
-import { iif, of } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { from, fromEvent, iif, of } from 'rxjs';
+import { buffer, bufferCount, concatMap, map, switchMap, take, takeLast, takeUntil, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
 import { TwitchUser } from 'src/Util/TwitchUser';
@@ -39,3 +41,26 @@ export const GetUserRoute = r.pipe(
 		map(({ user }) => ({ body: { ...user, id: undefined } })) // Hide the Twitch ID, as Twitch does not make this information public outside of OAuth2
 	))
 );
+
+/**
+ * WebSocket Subscriber
+ *
+ * Stream App Users
+ */
+export const WS_RequestUsers: WsEffect = event$ => {
+	return event$.pipe(
+		matchEvent('GetUsers'),
+		switchMap(ev => Mongo.Get().collection('users').pipe(map(col => ({ col, ev })))),
+		map(({ col, ev }) => ({ // Stream the users
+			stream: col.find({}).stream(),
+			col, ev
+		})),
+
+		// Listen for streamed users
+		switchMap(({ stream }) => fromEvent<DataStructure.TwitchUser>(stream, 'data').pipe(
+			takeUntil(fromEvent<void>(stream, 'close').pipe(take(1))), // Handle end of stream: complete observer
+			bufferCount(50), // Buffer up to 50 users for one packet
+			map(users => ({ type: 'GetUsers', payload: { users } })) // Dispatch the users data
+		))
+	);
+};
