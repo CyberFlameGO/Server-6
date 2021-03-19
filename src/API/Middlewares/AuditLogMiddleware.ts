@@ -24,7 +24,7 @@ export const AuditLogMiddleware = (entryType: keyof typeof DataStructure.AuditLo
 				action_user: req.user.id,
 				changes: [...(req.meta?.auditChanges ?? [])], // auditChanges are added by the InsertAuditChange pipeable operator defined below
 				target: req.meta?.auditTarget ?? undefined,
-				reason: req.headers['X-Action-Reason'] as string | undefined
+				reason: req.headers['x-action-reason'] as string | undefined
 			})),
 			tap(() => Logger.Get().info(''.concat(
 				`<Audit> [User: ${((req.user.instance as TwitchUser)?.data.display_name ?? req.user.id) ?? 'Anonymous'}]: `, // Action User

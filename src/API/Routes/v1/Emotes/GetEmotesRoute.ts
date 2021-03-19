@@ -3,12 +3,12 @@ import { ObjectId, FilterQuery } from 'mongodb';
 import { Constants } from '@typings/src/Constants';
 import { DataStructure } from '@typings/typings/DataStructure';
 import { defer, from, iif, noop, of } from 'rxjs';
-import { switchMap, map, mapTo } from 'rxjs/operators';
+import { switchMap, map, mapTo, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
 import { TwitchUser } from 'src/Util/TwitchUser';
+import { HttpError } from 'src/Util/HttpError';
 
-const unknownEmoteError = (req: HttpRequest) => req.response.send({ status: 404, body: { error: 'Unknown Emote' } });
 /**
  * GET /emotes/:emote
  *
@@ -19,10 +19,10 @@ export const GetEmoteRoute = r.pipe(
 	r.matchType('GET'),
 	r.use(AuthorizeMiddleware(true)),
 	r.useEffect(req$ => req$.pipe(
-		map(req => req as HttpRequest<{}, GetEmoteParams> & WithUser),
+		map(req => req as HttpRequest<{}, GetEmoteParams, GetEmoteQuery> & WithUser),
 		switchMap(req => iif(() => ObjectId.isValid(req.params.emote), // Reject the request if invalid object ID
 			of(req),
-			defer(() => unknownEmoteError(req))
+			defer(() => HttpError.UnknownEmote(req))
 		)),
 
 		switchMap(req => Mongo.Get().collection('emotes').pipe(map(col => ({ col, req })))),
@@ -31,20 +31,37 @@ export const GetEmoteRoute = r.pipe(
 			status: { $not: { $eq: Constants.Emotes.Status.DELETED } }
 		})).pipe(map(emote => ({ emote, req })))),
 
-		switchMap(({ req, emote }) => !!emote ? of({ emote, req }) : unknownEmoteError(req)),
-
+		// Verify the emote exists, if not, send 404
+		switchMap(({ req, emote }) => !!emote ? of({ emote, req }) : HttpError.UnknownEmote(req)),
 
 		// Get the authenticated user, if exists
 		// This is for checking if it is a privileged user who may be able to view a private emote
 		switchMap(({ req, emote }) => (emote?.private && !!req.user) ? req.user.getUser.pipe(mapTo({ req, emote })) : of({ req, emote })),
-		switchMap(({ emote, req }) => (emote.private && !req.user.instance?.isMod()) ? (new ObjectId(emote.owner).equals(req.user?.id) ? of(emote) : unknownEmoteError(req)) : of(emote)),
-		map(emote => ({
-			body: emote
+		switchMap(({ emote, req }) => (emote.private && !req.user.instance?.isMod()) ? (new ObjectId(emote.owner).equals(req.user?.id) ? of({ emote, req }) : HttpError.UnknownEmote(req)) : of(({ emote, req }))),
+
+		// Get audit activity on this emote
+		switchMap(({ emote, req }) => req.query.include_activity === 'true' ? Mongo.Get().collection('audit').pipe(
+			tap(() => console.log(emote)),
+			switchMap(col => col.find({
+				target: { id: emote._id as ObjectId, type: 'emotes' },
+				type: DataStructure.AuditLog.Entry.Type.EMOTE_EDIT
+			}).sort({ _id: -1 }).limit(10).toArray()),
+			map(entries => ({ audit_entries: entries, emote }))
+		) : of({ emote, audit_entries: [] })),
+
+		map(({ emote, audit_entries }) => ({
+			body: {
+				...emote,
+				audit_entries
+			}
 		}))
 	))
 );
 interface GetEmoteParams {
 	emote: string;
+}
+interface GetEmoteQuery {
+	include_activity: 'true' | 'false';
 }
 
 /**
