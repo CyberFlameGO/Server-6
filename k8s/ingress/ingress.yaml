@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: 7tv-ingress
+  namespace: 7tv
+spec:
+  rules:
+  - host: api-next.7tv.app
+    http:
+      paths:
+      - path: /
+        pathType: Exact
+        backend:
+          service:
+            name: http-svc
+            port:
+              number: 3000
