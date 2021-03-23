@@ -116,9 +116,10 @@ export class Emote {
 					'-loop', '0',
 					files[3][0],
 				]))),
+				tap(proc => proc.stderr.pipe(process.stdout)),
 				switchMap(proc => scheduled([
 					fromEvent(proc, 'message').pipe(tap(x => console.log(x))),
-					fromEvent(proc, 'exit').pipe(take(1))
+					fromEvent(proc, 'close').pipe(take(1))
 				], asapScheduler)),
 				delay(1000),
 				mapTo(sizes.map(a => a[0])),
