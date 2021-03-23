@@ -52,7 +52,6 @@ spec:
                 path: config.json
 
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -61,5 +60,9 @@ spec:
   selector:
     app: 7tv-nodeapi
   ports:
-  - port: 80
-    targetPort: 3000
+    - port: 80
+      name: http
+      targetPort: 3000
+    - port: 443
+      name: https
+      targetPort: 3000

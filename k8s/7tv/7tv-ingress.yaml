@@ -5,13 +5,24 @@ metadata:
   namespace: 7tv
 spec:
   rules:
-  - host: api.7tv.app
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: seventv-nodeapi-svc
-            port:
-              number: 80
+    - host: api.7tv.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: seventv-nodeapi-svc
+                port:
+                  number: 80
+
+    - host: 7tv.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: seventv-webapp-svc
+                port:
+                  number: 80
