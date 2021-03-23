@@ -1,5 +1,7 @@
-FROM ghcr.io/seventv/server/system:latest
+FROM node:12-alpine
 
+RUN apk add git
+RUN apk add --no-cache ffmpeg 
 
 WORKDIR /app
 ADD tsconfig.json .
@@ -13,7 +15,7 @@ ADD .env .
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
 
-RUN npm install --build-from-source --also=dev
+RUN npm install --also=dev
 RUN echo "{}" >> config.json
 RUN npm run build 
 
