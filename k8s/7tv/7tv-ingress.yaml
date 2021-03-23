@@ -5,13 +5,13 @@ metadata:
   namespace: 7tv
 spec:
   rules:
-  - host: api-next.7tv.app
+  - host: api.7tv.app
     http:
       paths:
       - path: /
-        pathType: Exact
+        pathType: Prefix
         backend:
           service:
-            name: http-svc
+            name: seventv-nodeapi-svc
             port:
-              number: 3000
+              number: 80

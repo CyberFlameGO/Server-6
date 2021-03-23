@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 7tv-nodeapi
+  namespace: 7tv
+  labels:
+    app: 7tv-nodeapi
+spec:
+  selector:
+    matchLabels:
+      app: 7tv-nodeapi
+  template:
+    metadata:
+      labels:
+        app: 7tv-nodeapi
+    spec:
+      terminationGracePeriodSeconds: 1
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: 7tv-nodeapi
+          image: ghcr.io/seventv/server:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: production
+          envFrom:
+            - prefix: cfg_
+              configMapRef:
+                name: nodeapi-config
+
+          resources:
+            requests:
+              memory: "85M"
+              cpu: "200m"
+            limits:
+              memory: "1G"
+              cpu: "1000m"
+          volumeMounts:
+            - mountPath: /app/config.json
+              subPath: config.json
+              name: config
+          ports:
+            - containerPort: 3000
+
+      volumes:
+        - name: config
+          configMap:
+            name: api-config
+            items:
+              - key: config-nodeapi.json
+                path: config.json
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: seventv-nodeapi-svc
+spec:
+  selector:
+    app: 7tv-nodeapi
+  ports:
+  - port: 80
+    targetPort: 3000
