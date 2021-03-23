@@ -1,4 +1,5 @@
-FROM registry.digitalocean.com/xiantis/7tv-app:server-sys
+FROM ghcr.io/seventv/server/system:latest
+
 
 WORKDIR /app
 ADD tsconfig.json .
