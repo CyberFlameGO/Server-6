@@ -1,7 +1,9 @@
 FROM node:12-alpine
 
 RUN apk add git
-RUN apk add --no-cache ffmpeg 
+RUN apk update && \
+	apk upgrade -U && \
+	apk add --no-cache ca-certificates ffmpeg libwebp libwebp-tools
 
 WORKDIR /app
 ADD tsconfig.json .
