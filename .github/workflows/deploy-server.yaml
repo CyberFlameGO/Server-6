@@ -1,0 +1,27 @@
+name: 7TV API Deploy
+
+on:
+  push:
+    branches: [master]
+
+  workflow_dispatch:
+    inputs:
+      comment:
+        description: Comment on triggering this workflow
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build Image with Server-Side Rendering & Push to Packages
+        uses: docker/build-push-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          repository: seventv/server
+          tag_with_ref: true
