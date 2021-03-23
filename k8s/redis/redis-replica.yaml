@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-replica
+  labels:
+    name: redis-replica
+spec:
+  replicas: 2 
+  selector:
+    matchLabels:
+      name: redis-replica
+  template:
+    metadata:
+      labels:
+        name: redis-replica
+    spec:
+      containers:
+      - name: redis
+        image: redis:6-alpine
+        resources:
+          requests:
+            memory: "10Mi"
+            cpu: "8m"
+          limits:
+            memory: "128Mi"
+            cpu: "80m"
+        command:
+          - "redis-server"
+        args:
+          - "--slaveof"
+          - "redis.7tv.svc.cluster.local"
+          - "6379"
+          - "--protected-mode"
+          - "no"   
+        ports:
+        - containerPort: 6379

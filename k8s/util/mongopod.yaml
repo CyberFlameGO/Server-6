@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongo-pod
+  namespace: mongodb
+  labels:
+    name: mongo-pod
+spec:
+  terminationGracePeriodSeconds: 1
+  containers:
+    - name: mongo-pod
+      image: mongo
+      resources:
+        requests:
+          memory: "40Mi"
+          cpu: "20m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      command: ["sh", "-c", "--"]
+      args: ["while true; do sleep 5; done;"]
