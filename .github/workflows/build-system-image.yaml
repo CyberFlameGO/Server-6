@@ -1,5 +1,8 @@
 name: Build System Image
 
+env:
+  IMAGE_TAG: ghcr.io/seventv/server/system
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,12 +15,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v2
+
       - name: Build System Image
-        uses: docker/build-push-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          repository: seventv/server/system
-          file: ./Sys.Dockerfile
-          tag_with_ref: true
+        run: docker build . --file Sys.Dockerfile --tag image
+
+      - name: Sign In with the Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push Image
+        run: |
+          docker tag image $IMAGE_TAG
+          docker push $IMAGE_TAG
