@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: 7tv-cert
+  namespace: 7tv
+spec:
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  secretName: 7tv-internal-tls
+  duration: 43800h # 5 years validity
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - server auth
+  dnsNames:
+    - 7tv.app
+    - api.7tv.app
+    - registry.7tv.app

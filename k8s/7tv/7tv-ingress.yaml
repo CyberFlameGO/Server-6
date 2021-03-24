@@ -26,3 +26,10 @@ spec:
                 name: seventv-webapp-svc
                 port:
                   number: 80
+
+  tls:
+    - hosts:
+        - 7tv.app
+        - api.7tv.app
+        - registry.7tv.app
+      secretName: 7tv-internal-tls
