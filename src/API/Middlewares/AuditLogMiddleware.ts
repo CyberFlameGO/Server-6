@@ -4,7 +4,7 @@ import { asapScheduler, EMPTY, fromEvent, Observable, of, scheduled } from 'rxjs
 import { filter, map, mergeAll, switchMap, switchMapTo, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';
 import { Logger } from 'src/Util/Logger';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 
 /**
  * Middleware: Audit Log Entry

@@ -6,7 +6,7 @@ import { from, fromEvent, iif, of } from 'rxjs';
 import { buffer, bufferCount, concatMap, map, switchMap, take, takeLast, takeUntil, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 
 /**
  * GET /users/:user

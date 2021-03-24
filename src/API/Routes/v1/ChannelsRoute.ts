@@ -8,7 +8,7 @@ import { catchError, map, mapTo, mergeAll, reduce, switchMap, switchMapTo } from
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 import { AuditLogMiddleware, InsertAuditChange, InsertAuditTarget } from 'src/API/Middlewares/AuditLogMiddleware';
 
 /**

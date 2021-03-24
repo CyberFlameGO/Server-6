@@ -4,7 +4,7 @@ import { Config } from 'src/Config';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { HttpMiddlewareEffect, HttpRequest } from '@marblejs/core';
 import { ObjectId } from 'mongodb';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 import { Mongo } from 'src/Db/Mongo';
 import jwt from 'jsonwebtoken';
 

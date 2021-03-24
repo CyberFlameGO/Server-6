@@ -5,7 +5,7 @@ import { concatAll, concatMap, delay, filter, map, mapTo, mergeAll, mergeMap, sw
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
 import { Logger } from 'src/Util/Logger';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 import { Constants as AppConstants } from '@typings/src/Constants';
 import { ObjectId } from 'mongodb';
 import { Mongo } from 'src/Db/Mongo';

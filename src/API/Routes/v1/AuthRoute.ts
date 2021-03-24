@@ -4,7 +4,7 @@ import { concatAll, map, mapTo, switchMap } from 'rxjs/operators';
 import { post } from 'superagent';
 import { asyncScheduler, Observable, scheduled } from 'rxjs';
 import { API } from '@typings/typings/API';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 import jwt from 'jsonwebtoken';
 
 namespace GetAuthURL {

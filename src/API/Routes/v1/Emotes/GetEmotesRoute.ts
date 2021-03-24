@@ -6,7 +6,7 @@ import { defer, from, iif, noop, of } from 'rxjs';
 import { switchMap, map, mapTo, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
-import { TwitchUser } from 'src/Util/TwitchUser';
+import { TwitchUser } from 'src/Components/TwitchUser';
 import { HttpError } from 'src/Util/HttpError';
 
 /**
