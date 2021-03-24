@@ -38,9 +38,10 @@ jobs:
     steps:
         # Deploy to k8s
         - name: Apply Deployment & Rollout
-          uses: Consensys/kubernetes-action@master
+          uses: steebchen/kubectl@master
           env:
             KUBE_CONFIG_DATA: ${{ secrets.K8S_CONFIG }}
+            KUBECTL_VERSION: "1.20"
           with:
             args: |
               apply -f k8s/7tv/7tv-nodeapi.yaml
