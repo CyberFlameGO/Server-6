@@ -37,8 +37,10 @@ jobs:
 
     steps:
         # Deploy to k8s
-        - name: Apply Deployment & Rollout
+        - name: Install kubectl&
           uses: azure/setup-kubectl@v1e
+
+        - name: Apply Deployment & Rollout
           env:
             KUBE_CONFIG_DATA: ${{ secrets.K8S_CONFIG }}
           run: |
