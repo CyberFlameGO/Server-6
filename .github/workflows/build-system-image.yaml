@@ -1,0 +1,23 @@
+name: Build System Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Image Version
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build System Image
+        uses: docker/build-push-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          repository: seventv/server/system
+          file: ./Sys.Dockerfile
+          tag_with_ref: true
