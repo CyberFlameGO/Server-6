@@ -5,9 +5,9 @@ metadata:
   name: can-deploy-7tv
 rules:
   - apiGroups: ["", "extensions", "apps"]
-    verbs: ["patch"] # Only allow patching the resources (for using the rollout command)
-    resources: ["deployments"] # Only deployments
-    resourceNames: ["7tv-nodeapi", "7tv-goapi", "7tv-webapp"] # Only the defined deployables
+    verbs: ["get", "patch"] # Only allow patching the resources (for using the rollout command)
+    resources: ["deployments", "statefulsets", "services"]
+    # resourceNames: ["7tv-nodeapi", "7tv-goapi", "7tv-webapp"] # Only the defined deployables
 
 ---
 
