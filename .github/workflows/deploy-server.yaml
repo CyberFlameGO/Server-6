@@ -44,4 +44,4 @@ jobs:
           with:
             args: |
               apply -f k8s/7tv/7tv-nodeapi.yaml
-              rollout rollout restart -n 7tv deploy/7tv-nodeapi
+              rollout restart -n 7tv deploy/7tv-nodeapi
