@@ -36,6 +36,9 @@ jobs:
       - build
 
     steps:
+        # Checkout repository
+        - uses: actions/checkout@v2
+
         # Deploy to k8s
         - name: Install kubectl&
           uses: azure/setup-kubectl@v1
