@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: 7tv
+  name: can-deploy-7tv
+rules:
+  - apiGroups: ["", "extensions", "apps"]
+    verbs: ["patch"] # Only allow patching the resources (for using the rollout command)
+    resources: ["deployments"] # Only deployments
+    resourceNames: ["7tv-nodeapi", "7tv-goapi", "7tv-webapp"] # Only the defined deployables
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: 7tv
+  name: can-deploy-7tv-bind
+
+subjects:
+  - name: 7tv-deployer
+    kind: ServiceAccount
+    namespace: 7tv
+roleRef:
+  kind: Role
+  name: can-deploy-7tv
+  apiGroup: rbac.authorization.k8s.io
