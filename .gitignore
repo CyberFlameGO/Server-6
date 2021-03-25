@@ -4,3 +4,4 @@ dist/
 .aws*
 config.json
 logs/
+k8s/local

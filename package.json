@@ -28,6 +28,7 @@
     "date-fns": "^2.17.0",
     "fp-ts": "^2.9.5",
     "fs-extra": "^9.1.0",
+    "ioredis": "^4.24.4",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.6.4",
     "rxjs": "^6.6.3",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.16",
     "@types/fs-extra": "^9.0.7",
+    "@types/ioredis": "^4.22.1",
     "@types/mongodb": "^3.6.8",
     "@types/node": "^14.14.30",
     "@types/superagent": "^4.1.10",
