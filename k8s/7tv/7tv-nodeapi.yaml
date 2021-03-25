@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: 7tv-nodeapi
   namespace: 7tv
   labels:
     app: 7tv-nodeapi
 spec:
+  serviceName: seventv-nodeapi-svc
   selector:
     matchLabels:
       app: 7tv-nodeapi
