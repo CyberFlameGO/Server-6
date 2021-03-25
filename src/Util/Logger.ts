@@ -8,7 +8,7 @@ const ctx = new chalk.Instance({ level: 3 });
 export class Logger {
 	private static instance: Logger;
 	static Get(): Logger {
-		return this.instance ?? (new Logger());
+		return this.instance ?? (this.instance = new Logger());
 	}
 
 	logCreated = new Subject<Logger.Log>();
