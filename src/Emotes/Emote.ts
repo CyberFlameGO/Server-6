@@ -1,7 +1,7 @@
 import { DataStructure } from '@typings/typings/DataStructure';
 import { existsSync, mkdirp, createReadStream } from 'fs-extra';
-import { asapScheduler, asyncScheduler, defer, EMPTY, from, fromEvent, iif, noop, Observable, of, queueScheduler, scheduled, throwError, timer } from 'rxjs';
-import { concatAll, concatMap, delay, filter, map, mapTo, mergeAll, mergeMap, switchMap, switchMapTo, take, tap, toArray } from 'rxjs/operators';
+import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError, timer } from 'rxjs';
+import { concatAll, concatMap, filter, map, mapTo, mergeMap, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';
 import { EmoteStore } from 'src/Emotes/EmoteStore';
 import { Config } from 'src/Config';
 import { Logger } from 'src/Util/Logger';
@@ -9,7 +9,10 @@ import { TwitchUser } from 'src/Components/TwitchUser';
 import { Constants as AppConstants } from '@typings/src/Constants';
 import { ObjectId } from 'mongodb';
 import { Mongo } from 'src/Db/Mongo';
-import { spawn } from 'child_process';
+import sharp from 'sharp';
+import imagemin from 'imagemin';
+import imageminPng from 'imagemin-pngquant';
+import imageminGif from 'imagemin-gifsicle';
 import { Constants } from 'src/Util/Constants';
 
 export class Emote {
@@ -45,6 +48,18 @@ export class Emote {
 					})),
 					toArray(),
 					map(arr => sizes.push(...arr.reverse())),
+				),
+
+				from(sizes).pipe(
+					concatMap(size => this.optimize(size).pipe(
+						tap(() => observer.next({
+							tasks: [taskIndex++, taskCount],
+							message: `Optimizing emote... (${size.scope}/4)`,
+							emoteID
+						})),
+						mapTo(size)
+					)),
+					toArray()
 				),
 
 				from(sizes).pipe(
@@ -84,45 +99,33 @@ export class Emote {
 			// array elements - 0: scope, 1: width (px), height (px)
 			// Needs to be in descending order or it will look scuffed
 			const sizes = [[4, 384, 128], [3, 228, 76], [2, 144, 48], [1, 96, 32]];
-			const fileExtension = 'webp';
-			const ogFilePath = `${this.filepath}/og`;
-
-			const files = [
-				[`${this.filepath}/4x.webp`, '4x'],
-				[`${this.filepath}/3x.webp`, '3x'],
-				[`${this.filepath}/2x.webp`, '2x'],
-				[`${this.filepath}/1x.webp`, '1x'],
-			];
+			const isAnimated = this.data.mime === 'image/gif';
+			const fileExtension = isAnimated ? 'gif' : 'png';
+			const originalSize = Array(2) as number[];
 
 			this.ensureFilepath().pipe( // Read original image
-				switchMap(() => of(spawn('ffmpeg', [
-					'-y',
-					'-i', ogFilePath,
-					'-filter_complex', 'scale=if(gte(iw*128/ih\\,384)\\,384\\,-1):128,split=2[four][out1],[out1]scale=-1:min(76\\,ih),split=2[three][out2],[out2]scale=-1:min(48\\,ih),split=2[two][out3],[out3]scale=-1:min(32\\,ih)[one]',
-					'-map', '[four]',
-					'-qscale', '90',
-					'-loop', '0',
-					files[0][0],
-					'-map', '[three]',
-					'-qscale', '70',
-					'-loop', '0',
-					files[1][0],
-					'-map', '[two]',
-					'-qscale', '50',
-					'-loop', '0',
-					files[2][0],
-					'-map', '[one]',
-					'-qscale', '30',
-					'-loop', '0',
-					files[3][0],
-				]))),
-				tap(proc => proc.stderr.pipe(process.stdout)),
-				switchMap(proc => scheduled([
-					fromEvent(proc, 'close').pipe(take(1))
-				], asapScheduler).pipe(concatAll())),
-				delay(1000),
-				mapTo(sizes.map(a => a[0])),
-				mergeAll(),
+				switchMap(() => of(sharp(`${this.filepath}/og`, { animated: true }))),
+				switchMap(image => from(image.metadata()).pipe(map(meta => ({ meta, image })))),
+				tap(({ meta }) => { // Save original size
+					originalSize[0] = meta.width ?? 0;
+					// For multi-frame (gif) image, divide height by n pages, otherwise the height is totalled by the page count
+					originalSize[1] = (meta.pages ?? 1) > 1 ? (meta.height ?? 0) / (meta.pages ?? 0) : meta.height ?? 0;
+				}),
+				switchMap(({ image, meta }) => from(sizes).pipe(
+					map(([scope, width, height]) => ({
+						scope,
+						meta,
+						size: this.getSizeRatio(originalSize, [width, height]) // Get aspect ratio size
+					})),
+					concatMap(({ scope, size, meta }) => iif(() => isAnimated,
+						of(undefined).pipe( // Gif resize: set height to scope by n pages
+							switchMap(() => image.toFormat('gif', { pageHeight: size[1] }).resize(size[0], size[1] * (meta.pages ?? 1)).toFile(`${this.filepath}/${scope}x.${fileExtension}`))
+						),
+						of(undefined).pipe( // Still resize
+							switchMap(() => image.resize(size[0], size[1], undefined).toFormat('png').toFile(`${this.filepath}/${scope}x.${fileExtension}`))
+						)
+					).pipe(mapTo((scope))))
+				)),
 
 				map(scope => ({ // Emit "resized" objects, used to upload emote sizes to the CDN
 					scope,
@@ -138,6 +141,32 @@ export class Emote {
 	}
 
 	/**
+	 * Optimize this emote
+	 */
+	optimize(size: Emote.Resized): Observable<imagemin.Result> {
+		return new Observable<imagemin.Result>(observer => {
+			const isAnimated = size.extension === 'gif';
+			from(imagemin([size.path], {
+				plugins: [isAnimated
+					? imageminGif({
+						optimizationLevel: 3,
+						interlaced: true,
+						colors: 200
+					})
+					: imageminPng({
+						strip: true,
+						quality: [0.4, 0.75]
+					})
+				], destination: `${this.filepath}/min`
+			})).subscribe({
+				next(result) { observer.next(result[0]); },
+				complete() { observer.complete(); },
+				error(err) { observer.error(err); }
+			});
+		});
+	}
+
+	/**
 	 * Upload this emote to the CDN
 	 */
 	upload(size: Emote.Resized): Observable<number> {
@@ -146,7 +175,7 @@ export class Emote {
 				Bucket: Config.s3_bucket_name ?? '7tv',
 				Key: `${EmoteStore.getEmoteObjectKey(String(this.id))}/${size.scope}x`,
 				Body: createReadStream(size.path),
-				ContentType: 'image/webp',
+				ContentType: this.data.mime,
 				ACL: 'public-read'
 			}).then(() => observer.next(size.scope)).catch(err => observer.error(err)).finally(() => observer.complete());
 		});
