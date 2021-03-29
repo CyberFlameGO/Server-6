@@ -8,13 +8,12 @@ ADD package.json .
 ADD package-lock.json .
 ADD src ./src
 ADD worker_bootstrap.js .
-ADD .env .
 
 # Clone typings repo
 RUN git clone https://github.com/SevenTV/Typings.git
 
 # Install packages
-RUN npm install --also=dev
+RUN npm install --build-from-source --also=dev
 
 # Build app
 RUN echo "{}" >> config.json
