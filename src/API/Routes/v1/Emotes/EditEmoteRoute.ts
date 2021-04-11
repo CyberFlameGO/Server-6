@@ -1,6 +1,6 @@
 import { HttpRequest, r } from '@marblejs/core';
 import { Constants } from '@typings/src/Constants';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { ObjectId } from 'mongodb';
 import { defer, iif, of, throwError } from 'rxjs';
 import { switchMap, tap, catchError, map, mapTo } from 'rxjs/operators';

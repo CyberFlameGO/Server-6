@@ -1,4 +1,4 @@
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { API } from '@typings/typings/API';
 import { Config } from 'src/Config';
 import { Constants } from 'src/Util/Constants';

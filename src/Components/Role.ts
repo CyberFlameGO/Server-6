@@ -1,5 +1,5 @@
 import { Long, ObjectId } from 'mongodb';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { Observable } from 'rxjs';
 import { Redis } from 'src/Client/Redis';
 import { Mongo } from 'src/Db/Mongo';

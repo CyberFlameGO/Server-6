@@ -1,8 +1,8 @@
 import { HttpRequest, matchEvent, r } from '@marblejs/core';
 import { WsEffect } from '@marblejs/websockets';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { ObjectId } from 'mongodb';
-import { from, fromEvent, iif, of } from 'rxjs';
+import { from, fromEvent, iif, noop, of } from 'rxjs';
 import { buffer, bufferCount, concatMap, map, switchMap, take, takeLast, takeUntil, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';
 import { Mongo } from 'src/Db/Mongo';
@@ -47,7 +47,8 @@ export const GetUserRoute = r.pipe(
  *
  * Stream App Users
  */
-export const WS_RequestUsers: WsEffect = event$ => {
+export const WS_RequestUsers: WsEffect = (event$, ctx) => {
+	let done = false;
 	return event$.pipe(
 		matchEvent('GetUsers'),
 		switchMap(ev => Mongo.Get().collection('users').pipe(map(col => ({ col, ev })))),
@@ -58,9 +59,14 @@ export const WS_RequestUsers: WsEffect = event$ => {
 
 		// Listen for streamed users
 		switchMap(({ stream }) => fromEvent<DataStructure.TwitchUser>(stream, 'data').pipe(
-			takeUntil(fromEvent<void>(stream, 'close').pipe(take(1))), // Handle end of stream: complete observer
+			takeUntil(fromEvent<void>(stream, 'close').pipe(
+				take(1),
+				tap(() => done = true)
+			)), // Handle end of stream: complete observer
 			bufferCount(50), // Buffer up to 50 users for one packet
 			map(users => ({ type: 'GetUsers', payload: { users } })) // Dispatch the users data
-		))
+		)),
+
+		tap(() => done ? setTimeout(() => ctx.client.close(1000), 0) : noop())
 	);
 };

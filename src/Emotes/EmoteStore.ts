@@ -5,7 +5,7 @@ import { map, mapTo, mergeAll, switchMap, take, tap } from 'rxjs/operators';
 import { Emote } from 'src/Emotes/Emote';
 import { ObjectId } from 'mongodb';
 import { Mongo } from 'src/Db/Mongo';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { Constants as AppConstants } from '@typings/src/Constants';
 import { Constants } from 'src/Util/Constants';
 import { Worker } from 'worker_threads';

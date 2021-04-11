@@ -1,5 +1,5 @@
 import { HttpRequest } from '@marblejs/core';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { asapScheduler, EMPTY, fromEvent, Observable, of, scheduled } from 'rxjs';
 import { filter, map, mergeAll, switchMap, switchMapTo, tap } from 'rxjs/operators';
 import { Mongo } from 'src/Db/Mongo';

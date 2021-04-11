@@ -1,4 +1,4 @@
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { existsSync, mkdirp, createReadStream } from 'fs-extra';
 import { asyncScheduler, defer, EMPTY, from, iif, noop, Observable, of, queueScheduler, scheduled, throwError, timer } from 'rxjs';
 import { concatAll, concatMap, filter, map, mapTo, mergeMap, switchMap, switchMapTo, tap, toArray } from 'rxjs/operators';

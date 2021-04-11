@@ -1,7 +1,7 @@
 import { HttpRequest, r } from '@marblejs/core';
 import { ObjectId, FilterQuery } from 'mongodb';
 import { Constants } from '@typings/src/Constants';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { defer, from, iif, noop, of } from 'rxjs';
 import { switchMap, map, mapTo, tap } from 'rxjs/operators';
 import { AuthorizeMiddleware, WithUser } from 'src/API/Middlewares/AuthorizeMiddleware';

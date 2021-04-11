@@ -2,7 +2,7 @@ import { matchEvent, r, use } from '@marblejs/core';
 import { multipart$ } from '@marblejs/middleware-multipart';
 import { WsEffect } from '@marblejs/websockets';
 import { Constants } from '@typings/src/Constants';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { ObjectId } from 'bson';
 import { basename, extname } from 'path';
 import { of, noop, throwError, iif, defer } from 'rxjs';

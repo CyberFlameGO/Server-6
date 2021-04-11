@@ -1,7 +1,7 @@
 import { combineRoutes, HttpRequest, r } from '@marblejs/core';
 import { Collection } from 'mongodb';
 import { Constants } from '@typings/src/Constants';
-import { DataStructure } from '@typings/typings/DataStructure';
+import { DataStructure } from '@typings/typings/DataStructure.v1';
 import { ObjectId } from 'bson';
 import { asyncScheduler, BehaviorSubject, defer, iif, of, scheduled } from 'rxjs';
 import { catchError, map, mapTo, mergeAll, reduce, switchMap, switchMapTo } from 'rxjs/operators';
