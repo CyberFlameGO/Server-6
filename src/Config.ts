@@ -16,6 +16,6 @@ interface ConfigType extends TypeofCfg {
 	for (const k of keys) {
 		const qualifiedKey = k.replace('cfg_', '');
 		console.log(k, qualifiedKey);
-		(Config as any)[qualifiedKey] = process.env[k];
+		(Config as any)[qualifiedKey] = JSON.parse(JSON.stringify(process.env[k]));
 	}
 }
