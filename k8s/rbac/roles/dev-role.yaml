@@ -1,0 +1,64 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  namespace: default
+  name: developer
+rules:
+  - apiGroups: ["", "*"]
+    verbs: ["get", "watch", "list"] # Only allow patching the resources (for using the rollout command)
+    resources: ["pods", "statefulsets", "deployments", "services", "namespace"]
+    # resourceNames: ["7tv-nodeapi", "7tv-goapi", "7tv-webapp"] # Only the defined deployables
+  - apiGroups: [""]
+    verbs: ["create"]
+    resources: ["pods/portforward", "services/portforward"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: default
+  name: developer-bind
+
+subjects:
+  - name: troy
+    kind: ServiceAccount
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: mongodb
+  name: developer-bind
+
+subjects:
+  - name: troy
+    kind: ServiceAccount
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: 7tv
+  name: developer-bind
+
+subjects:
+  - name: troy
+    kind: ServiceAccount
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: developer
+  apiGroup: rbac.authorization.k8s.io

@@ -53,22 +53,41 @@ spec:
           db: 7tv
       scramCredentialsSecretName: mongodb-scram-appuser
 
+    - name: troy # VeryPog
+      db: troy
+      passwordSecretRef:
+        name: mongodb-password-troyuser
+      roles:
+        - name: readWrite
+          db: troy
+        - name: read
+          db: iftroyreadsthisvivon
+      scramCredentialsSecretName: mongodb-scram-troyuser
+
   additionalMongodConfig:
     storage.wiredTiger.engineConfig.journalCompressor: zlib
 
+# ---
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: mongodb-password-rootuser
+# type: Opaque
+# stringData:
+#   password: <RootUserPassword>
+# ---
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: mongodb-password-appuser
+# type: Opaque
+# stringData:
+#   password: <AppUserPassword>
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mongodb-password-rootuser
+  name: mongodb-password-troyuser
 type: Opaque
 stringData:
-  password: <RootUserPassword>
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mongodb-password-appuser
-type: Opaque
-stringData:
-  password: <AppUserPassword>
+  password: eXFNVDJlbzRmdkQvYU9zVVBkQlNRdz09Cg==

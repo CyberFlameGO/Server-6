@@ -15,6 +15,13 @@ spec:
                 name: seventv-nodeapi-svc
                 port:
                   number: 80
+          - path: /v2
+            pathType: Prefix
+            backend:
+              service:
+                name: seventv-goapi-svc
+                port:
+                  number: 80
 
     - host: 7tv.app
       http:
