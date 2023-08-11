@@ -32,7 +32,7 @@
     "imagemin-gifsicle": "^7.0.0",
     "imagemin-pngquant": "^9.0.2",
     "ioredis": "^4.24.4",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "mongodb": "^3.6.4",
     "nanoid": "^3.1.22",
     "object-hash": "^2.1.1",
